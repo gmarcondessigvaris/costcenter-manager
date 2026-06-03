@@ -179,6 +179,7 @@ router.get('/invoices/:id/suggestions', authMiddleware, async (req, res) => {
 // â”€â”€ Assign (Cost center owner) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 router.put('/invoices/:id/assign', authMiddleware, async (req, res) => {
+  try {
   const actor = (req as AuthRequest).user
   const inv = await queryOne('SELECT id, cost_center_id, status FROM invoices WHERE id = $1', [req.params.id])
   if (!inv) { res.status(404).json({ detail: 'Invoice not found' }); return }
@@ -239,6 +240,10 @@ router.put('/invoices/:id/assign', authMiddleware, async (req, res) => {
     details: { amount, due_date, approver_1_id, approver_2_id, allocations: allocations.length },
   })
   res.json(await getInvoice(req.params.id))
+  } catch (err: any) {
+    console.error('[assign invoice]', err)
+    res.status(500).json({ detail: err?.message ?? 'Unexpected error during invoice assignment' })
+  }
 })
 
 // â”€â”€ Approve â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
