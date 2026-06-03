@@ -47,9 +47,7 @@ function MemberRow({ member, ccId, isAdmin }: {
 function AddMemberForm({ ccId }: { ccId: string }) {
   const qc = useQueryClient()
   const [q, setQ] = useState('')
-  const [selected, setSelected] = useState<User | null>(null)
-  const [role, setRole] = useState('owner')
-  const [open, setOpen] = useState(false)
+  const [adding, setAdding] = useState<string | null>(null) // userId being added
 
   const { data: results = [] } = useQuery({
     queryKey: ['user-search', q],
@@ -57,58 +55,55 @@ function AddMemberForm({ ccId }: { ccId: string }) {
     enabled: q.length >= 2,
   })
 
-  const addMut = useMutation({
-    mutationFn: () => addMember(ccId, selected!.id, role),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['cost-centers'] }); setSelected(null); setQ('') },
-  })
+  async function handleAdd(userId: string, role: string) {
+    setAdding(userId)
+    try {
+      await addMember(ccId, userId, role)
+      qc.invalidateQueries({ queryKey: ['cost-centers'] })
+      setQ('')
+    } finally {
+      setAdding(null)
+    }
+  }
 
   return (
     <div className="pt-3 border-t border-gray-100">
       <p className="text-xs font-semibold text-gray-500 mb-2">Add Member</p>
-      <div className="flex gap-2">
-        <div className="flex-1 relative">
-          {selected ? (
-            <div className="flex items-center gap-1 p-2 border border-gray-200 rounded-lg bg-gray-50 text-sm">
-              {selected.display_name}
-              <button onClick={() => setSelected(null)} className="ml-auto text-gray-400">×</button>
-            </div>
-          ) : (
-            <>
-              <input
-                type="text"
-                className="input text-sm"
-                placeholder="Search user…"
-                value={q}
-                onChange={e => { setQ(e.target.value); setOpen(true) }}
-              />
-              {open && results.length > 0 && (
-                <ul className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow max-h-36 overflow-y-auto">
-                  {results.map(u => (
-                    <li
-                      key={u.id}
-                      className="px-3 py-2 text-xs hover:bg-sigvaris-blue-pale cursor-pointer"
-                      onMouseDown={() => { setSelected(u); setQ(''); setOpen(false) }}
-                    >
-                      {u.display_name} <span className="text-gray-400">{u.email}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </>
-          )}
-        </div>
-        <select className="input w-28 text-sm" value={role} onChange={e => setRole(e.target.value)}>
-          <option value="owner">Owner</option>
-          <option value="viewer">Viewer</option>
-        </select>
-        <button
-          onClick={() => addMut.mutate()}
-          disabled={!selected || addMut.isPending}
-          className="btn-primary text-sm px-3"
-        >
-          Add
-        </button>
-      </div>
+      <input
+        type="text"
+        className="input text-sm"
+        placeholder="Search by name or email…"
+        value={q}
+        onChange={e => setQ(e.target.value)}
+      />
+      {results.length > 0 && q.length >= 2 && (
+        <ul className="mt-1 border border-gray-200 rounded-lg overflow-hidden">
+          {results.map(u => (
+            <li key={u.id} className="flex items-center justify-between px-3 py-2 bg-white hover:bg-gray-50 text-xs border-b border-gray-50 last:border-0">
+              <div>
+                <span className="font-medium text-gray-900">{u.display_name}</span>
+                <span className="text-gray-400 ml-2">{u.email}</span>
+              </div>
+              <div className="flex gap-1 shrink-0">
+                <button
+                  onMouseDown={() => handleAdd(u.id, 'owner')}
+                  disabled={adding === u.id}
+                  className="px-2 py-1 rounded bg-sigvaris-blue text-white text-xs hover:bg-sigvaris-blue-light disabled:opacity-50"
+                >
+                  + Owner
+                </button>
+                <button
+                  onMouseDown={() => handleAdd(u.id, 'viewer')}
+                  disabled={adding === u.id}
+                  className="px-2 py-1 rounded bg-gray-100 text-gray-700 text-xs hover:bg-gray-200 disabled:opacity-50"
+                >
+                  + Viewer
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }
