@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
@@ -70,7 +70,7 @@ function UploadModal({ onClose }: { onClose: () => void }) {
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
           <h2 className="font-semibold text-gray-900">Upload Invoice</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">Ã—</button>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
@@ -78,7 +78,7 @@ function UploadModal({ onClose }: { onClose: () => void }) {
             <select className="input" value={ccId} onChange={e => setCcId(e.target.value)} required>
               <option value="">Select cost center...</option>
               {costCenters.map(cc => (
-                <option key={cc.id} value={cc.id}>{cc.code} – {cc.name}</option>
+                <option key={cc.id} value={cc.id}>{cc.code} â€“ {cc.name}</option>
               ))}
             </select>
           </div>
@@ -150,7 +150,7 @@ export default function InvoicesPage() {
 
   const { data: costCenters = [] } = useQuery({ queryKey: ['cost-centers'], queryFn: listCostCenters })
 
-  const isFinance = user?.role === 'finance' || user?.role === 'admin'
+  const isFinance = user?.role === 'admin' || user?.role === 'super_admin'
 
   return (
     <div>
@@ -190,7 +190,7 @@ export default function InvoicesPage() {
         >
           <option value="">All cost centers</option>
           {costCenters.map(cc => (
-            <option key={cc.id} value={cc.id}>{cc.code} – {cc.name}</option>
+            <option key={cc.id} value={cc.id}>{cc.code} â€“ {cc.name}</option>
           ))}
         </select>
       </div>
@@ -198,7 +198,7 @@ export default function InvoicesPage() {
       {/* Table */}
       <div className="card p-0 overflow-hidden">
         {isLoading ? (
-          <div className="p-12 text-center text-gray-400">Loading…</div>
+          <div className="p-12 text-center text-gray-400">Loadingâ€¦</div>
         ) : invoices.length === 0 ? (
           <div className="p-12 text-center text-gray-400">No invoices found</div>
         ) : (
@@ -226,14 +226,14 @@ export default function InvoicesPage() {
                         <span className="block text-xs text-gray-400">{inv.invoice_number}</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-gray-600">{cc ? `${cc.code} – ${cc.name}` : '–'}</td>
+                    <td className="px-6 py-4 text-gray-600">{cc ? `${cc.code} â€“ ${cc.name}` : 'â€“'}</td>
                     <td className="px-6 py-4 text-gray-600">
                       {inv.amount
                         ? Number(inv.amount).toLocaleString('de-CH', { style: 'currency', currency: 'CHF' })
-                        : <span className="text-gray-300">–</span>}
+                        : <span className="text-gray-300">â€“</span>}
                     </td>
                     <td className="px-6 py-4 text-gray-600">
-                      {inv.due_date ? format(new Date(inv.due_date), 'dd MMM yyyy') : <span className="text-gray-300">–</span>}
+                      {inv.due_date ? format(new Date(inv.due_date), 'dd MMM yyyy') : <span className="text-gray-300">â€“</span>}
                     </td>
                     <td className="px-6 py-4 text-gray-400 text-xs">
                       {format(new Date(inv.created_at), 'dd MMM yyyy')}
