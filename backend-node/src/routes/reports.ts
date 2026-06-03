@@ -43,10 +43,15 @@ router.get('/reports/cost-centers/:id', authMiddleware, async (req, res) => {
     [ccId, fiscalYear]
   )
 
-  // All invoice allocations for this cost center (approved + pending)
+  // All approved invoice allocations — amounts converted to CHF via exchange_rate
   const allocations = await query(
-    `SELECT ia.id, ia.budget_line_id, ia.project_id, ia.amount,
-            i.id AS invoice_id, i.invoice_number, i.status, i.due_date, i.amount AS invoice_amount,
+    `SELECT ia.id, ia.budget_line_id, ia.project_id,
+            ia.amount,
+            ia.amount * COALESCE(i.exchange_rate, 1) AS amount_chf,
+            i.id AS invoice_id, i.invoice_number, i.status, i.due_date,
+            i.amount AS invoice_amount,
+            i.amount * COALESCE(i.exchange_rate, 1) AS invoice_amount_chf,
+            i.currency, i.exchange_rate,
             v.name AS vendor_name,
             p.code AS project_code, p.name AS project_name
      FROM invoice_allocations ia
@@ -54,7 +59,7 @@ router.get('/reports/cost-centers/:id', authMiddleware, async (req, res) => {
      JOIN vendors  v ON v.id = i.vendor_id
      LEFT JOIN projects p ON p.id = ia.project_id
      WHERE i.cost_center_id = $1
-       AND i.status IN ('pending_approval', 'approved')
+       AND i.status = 'approved'
      ORDER BY i.created_at DESC`,
     [ccId]
   )
@@ -79,7 +84,7 @@ router.get('/reports/cost-centers/:id', authMiddleware, async (req, res) => {
 
   const lines = budgetLines.map(bl => {
     const lineAllocs = byLine.get(bl.id as string) ?? []
-    const spent = lineAllocs.reduce((s, a) => s + Number(a.amount), 0)
+    const spent = lineAllocs.reduce((s, a) => s + Number(a.amount_chf), 0)
     totalBudget += Number(bl.budget_value)
     totalSpent  += spent
 
@@ -98,8 +103,12 @@ router.get('/reports/cost-centers/:id', authMiddleware, async (req, res) => {
         invoice_id: a.invoice_id,
         invoice_number: a.invoice_number,
         vendor_name: a.vendor_name,
+        currency: a.currency,
+        exchange_rate: Number(a.exchange_rate),
         invoice_amount: Number(a.invoice_amount),
+        invoice_amount_chf: Number(a.invoice_amount_chf),
         allocated_amount: Number(a.amount),
+        allocated_amount_chf: Number(a.amount_chf),
         due_date: a.due_date,
         status: a.status,
       })),
@@ -112,15 +121,19 @@ router.get('/reports/cost-centers/:id', authMiddleware, async (req, res) => {
     invoice_id: a.invoice_id,
     invoice_number: a.invoice_number,
     vendor_name: a.vendor_name,
+    currency: a.currency,
+    exchange_rate: Number(a.exchange_rate),
     invoice_amount: Number(a.invoice_amount),
+    invoice_amount_chf: Number(a.invoice_amount_chf),
     allocated_amount: Number(a.amount),
+    allocated_amount_chf: Number(a.amount_chf),
     due_date: a.due_date,
     status: a.status,
     project_code: a.project_code,
     project_name: a.project_name,
   }))
 
-  totalSpent += projectAllocations.reduce((s, a) => s + Number(a.amount), 0)
+  totalSpent += projectAllocations.reduce((s, a) => s + Number(a.amount_chf), 0)
 
   res.json({
     cost_center: cc,
