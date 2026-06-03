@@ -140,6 +140,13 @@ export const getInvoicePdfUrl = (id: string) => `/api/invoices/${id}/pdf`
 export const listAccounts = () => api.get<Account[]>('/accounts').then(r => r.data)
 export const listItrCodes = () => api.get<ItrCode[]>('/itr-codes').then(r => r.data)
 
+// ── Currencies ────────────────────────────────────────────────────────────────
+export const listCurrencies = () => api.get('/currencies').then(r => r.data)
+export const createCurrency = (data: { code: string; name: string; rate_to_chf: number }) =>
+  api.post('/currencies', data).then(r => r.data)
+export const updateCurrency = (id: string, data: { name?: string; rate_to_chf?: number; is_active?: boolean }) =>
+  api.put(`/currencies/${id}`, data).then(r => r.data)
+
 // ── Reports ───────────────────────────────────────────────────────────────────
 export const getCostCenterReport = (ccId: string, fiscalYear: string) =>
   api.get(`/reports/cost-centers/${ccId}`, { params: { fiscal_year: fiscalYear } }).then(r => r.data)
