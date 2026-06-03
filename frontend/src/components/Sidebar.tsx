@@ -10,8 +10,13 @@ const navItems = [
   { to: '/cost-centers', label: 'Cost Centers', icon: '🏢' },
 ]
 
-const adminItems = [
-  { to: '/vendors',    label: 'Vendors',    icon: '🏭' },
+// Visible to finance + admin
+const financeItems = [
+  { to: '/vendors', label: 'Vendors', icon: '🏭' },
+]
+
+// Visible to admin only
+const adminOnlyItems = [
   { to: '/currencies', label: 'Currencies', icon: '💱' },
   { to: '/admin',      label: 'Admin',      icon: '⚙️' },
 ]
@@ -19,9 +24,10 @@ const adminItems = [
 export default function Sidebar() {
   const { user, logout } = useAuth()
 
-  const items = (user?.role === 'admin' || user?.role === 'finance')
-    ? [...navItems, ...adminItems]
-    : navItems
+  const items =
+    user?.role === 'admin'   ? [...navItems, ...financeItems, ...adminOnlyItems] :
+    user?.role === 'finance' ? [...navItems, ...financeItems] :
+    navItems
 
   return (
     <aside className="w-64 bg-sigvaris-blue flex flex-col shrink-0">
