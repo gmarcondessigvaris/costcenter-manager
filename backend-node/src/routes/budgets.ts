@@ -1,0 +1,149 @@
+﻿import { Router } from 'express'
+import multer from 'multer'
+import path from 'path'
+import fs from 'fs'
+import { v4 as uuidv4 } from 'uuid'
+import { authMiddleware, requireRole } from '../middleware/auth.ts'
+import { query, queryOne } from '../db.ts'
+import { logAction } from '../services/audit.ts'
+import { parseBudgetExcel } from '../services/budgetParser.ts'
+import type { AuthRequest } from '../types.ts'
+
+const router = Router()
+
+const uploadDir = process.env.UPLOAD_DIR ?? 'uploads'
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    fs.mkdirSync(path.join(uploadDir, 'budgets'), { recursive: true })
+    cb(null, path.join(uploadDir, 'budgets'))
+  },
+  filename: (_req, file, cb) => cb(null, `${uuidv4()}_${file.originalname}`),
+})
+const upload = multer({ storage, fileFilter: (_req, file, cb) => {
+  cb(null, /\.(xlsx|xls)$/i.test(file.originalname))
+}})
+
+// â”€â”€ Vendors â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+router.get('/vendors', authMiddleware, async (_req, res) => {
+  const rows = await query('SELECT id, name FROM vendors WHERE is_active = true ORDER BY name')
+  res.json(rows)
+})
+
+router.post('/vendors', authMiddleware, requireRole('finance', 'admin'), async (req, res) => {
+  const { name } = req.body as { name: string }
+  if (!name?.trim()) { res.status(400).json({ detail: 'name required' }); return }
+  const rows = await query(
+    `INSERT INTO vendors (name) VALUES ($1)
+     ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name RETURNING id, name`,
+    [name.trim()]
+  )
+  res.status(201).json(rows[0])
+})
+
+// â”€â”€ Budget uploads â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+router.post('/cost-centers/:id/budgets', authMiddleware, requireRole('finance', 'admin'),
+  upload.single('file'), async (req, res) => {
+    const ccId = req.params.id
+    const actor = (req as AuthRequest).user
+    const { fiscal_year } = req.body as { fiscal_year: string }
+
+    if (!req.file) { res.status(400).json({ detail: 'Excel file required' }); return }
+    const cc = await queryOne('SELECT id FROM cost_centers WHERE id = $1', [ccId])
+    if (!cc) { res.status(404).json({ detail: 'Cost center not found' }); return }
+
+    // Deactivate previous budget for the same year
+    await query(
+      'UPDATE budget_uploads SET is_active = false WHERE cost_center_id = $1 AND fiscal_year = $2',
+      [ccId, fiscal_year]
+    )
+
+    const uploadRows = await query(
+      `INSERT INTO budget_uploads (cost_center_id, fiscal_year, file_path, original_filename, uploaded_by_id)
+       VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+      [ccId, fiscal_year, req.file.path, req.file.originalname, actor.id]
+    )
+    const budgetUploadId = uploadRows[0].id as string
+
+    const lines = await parseBudgetExcel(req.file.path)
+    for (const line of lines) {
+      await query(
+        `INSERT INTO budget_lines (cost_center_id, budget_upload_id, code, name, allocated_amount)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [ccId, budgetUploadId, line.code, line.name, line.allocated_amount]
+      )
+    }
+
+    await logAction({
+      entityType: 'BudgetUpload', entityId: budgetUploadId, action: 'uploaded', userId: actor.id,
+      details: { cost_center_id: ccId, fiscal_year, lines: lines.length },
+    })
+
+    const result = await getBudgetUpload(budgetUploadId)
+    res.status(201).json(result)
+  }
+)
+
+async function getBudgetUpload(id: string) {
+  const bu = await queryOne(
+    `SELECT bu.id, bu.fiscal_year, bu.original_filename, bu.is_active, bu.created_at,
+            u.id AS user_id, u.display_name, u.email, u.role AS user_role
+     FROM budget_uploads bu JOIN users u ON u.id = bu.uploaded_by_id WHERE bu.id = $1`,
+    [id]
+  )
+  if (!bu) return null
+  const lines = await query(
+    'SELECT id, code, name, allocated_amount, is_active FROM budget_lines WHERE budget_upload_id = $1',
+    [id]
+  )
+  return {
+    id: bu.id, fiscal_year: bu.fiscal_year, original_filename: bu.original_filename,
+    is_active: bu.is_active, created_at: bu.created_at,
+    uploaded_by: { id: bu.user_id, display_name: bu.display_name, email: bu.email, role: bu.user_role },
+    budget_lines: lines,
+  }
+}
+
+router.get('/cost-centers/:id/budgets', authMiddleware, async (req, res) => {
+  const rows = await query(
+    'SELECT id FROM budget_uploads WHERE cost_center_id = $1 ORDER BY created_at DESC',
+    [req.params.id]
+  )
+  const result = await Promise.all(rows.map((r) => getBudgetUpload(r.id as string)))
+  res.json(result.filter(Boolean))
+})
+
+router.get('/cost-centers/:id/budget-lines', authMiddleware, async (req, res) => {
+  const { fiscal_year } = req.query as { fiscal_year?: string }
+  let sql = `SELECT bl.id, bl.code, bl.name, bl.allocated_amount, bl.is_active
+             FROM budget_lines bl
+             JOIN budget_uploads bu ON bu.id = bl.budget_upload_id
+             WHERE bl.cost_center_id = $1 AND bl.is_active = true AND bu.is_active = true`
+  const params: unknown[] = [req.params.id]
+  if (fiscal_year) { params.push(fiscal_year); sql += ` AND bu.fiscal_year = $${params.length}` }
+  sql += ' ORDER BY bl.code'
+  res.json(await query(sql, params))
+})
+
+// â”€â”€ Projects â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+router.get('/cost-centers/:id/projects', authMiddleware, async (req, res) => {
+  res.json(await query(
+    'SELECT id, code, name, description, is_active FROM projects WHERE cost_center_id = $1 AND is_active = true',
+    [req.params.id]
+  ))
+})
+
+router.post('/cost-centers/:id/projects', authMiddleware, async (req, res) => {
+  const actor = (req as AuthRequest).user
+  const { code, name, description } = req.body as { code: string; name: string; description?: string }
+  if (!code || !name) { res.status(400).json({ detail: 'code and name required' }); return }
+  const rows = await query(
+    'INSERT INTO projects (cost_center_id, code, name, description, created_by_id) VALUES ($1,$2,$3,$4,$5) RETURNING id, code, name, description, is_active',
+    [req.params.id, code, name, description ?? null, actor.id]
+  )
+  res.status(201).json(rows[0])
+})
+
+export default router
