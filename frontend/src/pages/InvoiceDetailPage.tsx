@@ -289,7 +289,10 @@ export default function InvoiceDetailPage() {
   if (isLoading) return <div className="p-8 text-gray-400">Loading…</div>
   if (!invoice)  return <div className="p-8 text-gray-400">Invoice not found</div>
 
-  const myPendingStep = invoice.approval_steps.find(s => s.approver.id === user?.id && s.status === 'pending')
+  const myPendingStep   = invoice.approval_steps.find(s => s.approver.id === user?.id && s.status === 'pending')
+  const priorStepPending = myPendingStep
+    ? invoice.approval_steps.some(s => s.step_order < myPendingStep.step_order && s.status === 'pending')
+    : false
   const canApprove    = !!myPendingStep && invoice.status === 'pending_approval'
   const canAssign     = invoice.status === 'pending_assignment'
 
@@ -482,14 +485,26 @@ export default function InvoiceDetailPage() {
             {/* Approve / Reject */}
             {canApprove && (
               <div className="pt-3 border-t border-gray-100 space-y-2">
-                <p className="text-xs text-gray-400">Your turn — step {myPendingStep!.step_order}</p>
+                {priorStepPending ? (
+                  <div className="text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2">
+                    ⏳ Waiting for step {myPendingStep!.step_order - 1} approval before you can act.
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-400">Your turn — step {myPendingStep!.step_order}</p>
+                )}
                 <div className="flex gap-2">
-                  <button onClick={() => approveMut.mutate()} disabled={approveMut.isPending}
-                    className="btn-primary flex-1 justify-center text-sm py-2">✓ Approve</button>
+                  <button onClick={() => approveMut.mutate()}
+                    disabled={approveMut.isPending || priorStepPending}
+                    className="btn-primary flex-1 justify-center text-sm py-2 disabled:opacity-40 disabled:cursor-not-allowed">
+                    ✓ Approve
+                  </button>
                   <button onClick={() => setShowReject(s => !s)}
-                    className="btn-danger flex-1 justify-center text-sm py-2">✗ Reject</button>
+                    disabled={priorStepPending}
+                    className="btn-danger flex-1 justify-center text-sm py-2 disabled:opacity-40 disabled:cursor-not-allowed">
+                    ✗ Reject
+                  </button>
                 </div>
-                {showReject && (
+                {!priorStepPending && showReject && (
                   <div>
                     <textarea className="input text-sm" rows={2} value={rejectComment}
                       onChange={e => setRejectComment(e.target.value)} placeholder="Rejection reason…" />
