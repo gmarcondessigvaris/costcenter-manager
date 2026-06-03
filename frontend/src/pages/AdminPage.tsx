@@ -1,9 +1,8 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { listUsers, updateUserRole } from '../services/api'
+import { listUsers, updateUserRole, createUser } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import { Navigate } from 'react-router-dom'
-import axios from 'axios'
 import type { UserRole } from '../types'
 
 const ROLE_COLORS: Record<UserRole, string> = {
@@ -19,7 +18,7 @@ function CreateUserForm({ onCreated }: { onCreated: () => void }) {
   const [error, setError] = useState('')
 
   const createMut = useMutation({
-    mutationFn: () => axios.post('/api/users', { display_name: name, email, role }),
+    mutationFn: () => createUser({ display_name: name, email, role }),
     onSuccess: () => { setName(''); setEmail(''); setRole('user'); setError(''); onCreated() },
     onError: (e: any) => setError(e.response?.data?.detail || 'Failed to create user'),
   })
@@ -78,8 +77,7 @@ export default function AdminPage() {
   const { user } = useAuth()
   const qc = useQueryClient()
 
-  if (user?.role !== 'admin') return <Navigate to="/dashboard" replace />
-
+  // All hooks must be called before any conditional return
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['users'],
     queryFn: listUsers,
@@ -89,6 +87,8 @@ export default function AdminPage() {
     mutationFn: ({ id, role }: { id: string; role: string }) => updateUserRole(id, role),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
   })
+
+  if (user?.role !== 'admin') return <Navigate to="/dashboard" replace />
 
   return (
     <div>
