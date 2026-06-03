@@ -22,12 +22,34 @@ export interface CostCenter {
   members: CostCenterMember[]
 }
 
+export interface Account {
+  id: string
+  code: string
+  description: string
+  is_active: boolean
+}
+
+export interface ItrCode {
+  id: string
+  code: string
+  description: string
+  is_active: boolean
+}
+
 export interface BudgetLine {
   id: string
   code: string
   name: string
   allocated_amount: number
   is_active: boolean
+  // enriched fields
+  description?: string
+  account_id?: string
+  account_code?: string
+  account_description?: string
+  itr_code_id?: string
+  itr_code?: string
+  itr_description?: string
 }
 
 export interface BudgetUpload {
