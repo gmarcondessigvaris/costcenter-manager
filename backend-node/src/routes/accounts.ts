@@ -1,4 +1,4 @@
-import { Router } from 'express'
+﻿import { Router } from 'express'
 import { authMiddleware } from '../middleware/auth.ts'
 import { query } from '../db.ts'
 import type { AuthRequest } from '../types.ts'
@@ -8,7 +8,7 @@ const router = Router()
 router.get('/accounts', authMiddleware, async (req, res) => {
   const user = (req as AuthRequest).user
 
-  if (user.role === 'admin' || user.role === 'finance') {
+  if (user.role === 'super_admin' || user.role === 'admin') {
     return res.json(await query(
       'SELECT id, code, description, is_active FROM accounts WHERE is_active = true ORDER BY code'
     ))
