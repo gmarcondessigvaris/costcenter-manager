@@ -41,7 +41,7 @@ export default function CurrenciesPage() {
   })
 
   if (loading) return <div className="p-8 text-gray-400">Loading…</div>
-  if (user?.role !== 'super_admin') return <Navigate to="/dashboard" replace />
+  if (user?.role !== 'super_admin' && user?.role !== 'admin') return <Navigate to="/dashboard" replace />
 
   const active   = currencies.filter((c: any) => c.is_active)
   const inactive = currencies.filter((c: any) => !c.is_active)
