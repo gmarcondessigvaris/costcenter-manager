@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'finance' | 'user'
+﻿export type UserRole = 'super_admin' | 'admin' | 'user'
 
 export interface User {
   id: string
@@ -11,7 +11,7 @@ export interface User {
 export interface CostCenterMember {
   id: string
   user: User
-  role: 'owner' | 'viewer'
+  role: 'cc_owner'
 }
 
 export interface CostCenter {
