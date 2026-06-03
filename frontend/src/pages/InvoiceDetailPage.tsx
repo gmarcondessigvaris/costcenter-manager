@@ -62,6 +62,7 @@ interface AssignForm   { amount: string; invoice_date: string; notes: string; al
 function AssignmentForm({ invoiceId, costCenterId, onDone }: {
   invoiceId: string; costCenterId: string; onDone: () => void
 }) {
+  const { user: currentUser } = useAuth()
   const qc = useQueryClient()
   const [approver1, setApprover1] = useState<User | null>(null)
   const [approver2, setApprover2] = useState<User | null>(null)
@@ -110,6 +111,8 @@ function AssignmentForm({ invoiceId, costCenterId, onDone }: {
     if (multiLine && invoiceTotal > 0 && Math.abs(remaining) > 0.01)
       return setError(`Allocation total (${CHF(totalAllocated)}) must equal invoice amount (${CHF(invoiceTotal)})`)
 
+    const isSelfApprover1 = currentUser?.id === approver1.id
+
     assignMut.mutate({
       amount: parseFloat(form.amount), due_date: form.invoice_date,
       notes: form.notes || undefined, currency,
@@ -119,6 +122,7 @@ function AssignmentForm({ invoiceId, costCenterId, onDone }: {
         amount: parseFloat(a.amount), notes: a.notes || undefined,
       })),
       approver_1_id: approver1.id, approver_2_id: approver2.id,
+      auto_approve_first_step: isSelfApprover1,
     } as any)
   }
 
@@ -216,7 +220,11 @@ function AssignmentForm({ invoiceId, costCenterId, onDone }: {
 
       {error && <p className="text-red-600 text-sm">{error}</p>}
       <button type="submit" disabled={assignMut.isPending} className="btn-primary w-full justify-center">
-        {assignMut.isPending ? 'Submitting…' : 'Submit for Approval'}
+        {assignMut.isPending
+          ? 'Saving…'
+          : currentUser?.id === approver1?.id
+            ? 'Save and Approve'
+            : 'Save'}
       </button>
     </form>
   )
