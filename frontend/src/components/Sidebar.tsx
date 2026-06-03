@@ -3,20 +3,20 @@ import { useAuth } from '../contexts/AuthContext'
 import logo from '../assets/logo.svg'
 
 const navItems = [
-  { to: '/dashboard', label: 'Dashboard', icon: '⊞' },
-  { to: '/invoices', label: 'Invoices', icon: '📄' },
-  { to: '/budgets', label: 'Budgets', icon: '💰' },
-  { to: '/reports', label: 'Reports', icon: '📊' },
-  { to: '/cost-centers', label: 'Cost Centers', icon: '🏢' },
+  { to: '/dashboard',   label: 'Dashboard',    icon: '⊞' },
+  { to: '/invoices',    label: 'Invoices',     icon: '📄' },
+  { to: '/budgets',     label: 'Budgets',      icon: '💰' },
+  { to: '/reports',     label: 'Reports',      icon: '📊' },
+  { to: '/cost-centers',label: 'Cost Centers', icon: '🏢' },
 ]
 
-// Visible to finance + admin
-const financeItems = [
+// Visible to admin + super_admin
+const adminItems = [
   { to: '/vendors', label: 'Vendors', icon: '🏭' },
 ]
 
-// Visible to admin only
-const adminOnlyItems = [
+// Visible to super_admin only
+const superAdminItems = [
   { to: '/currencies', label: 'Currencies', icon: '💱' },
   { to: '/admin',      label: 'Admin',      icon: '⚙️' },
 ]
@@ -25,8 +25,8 @@ export default function Sidebar() {
   const { user, logout } = useAuth()
 
   const items =
-    user?.role === 'admin'   ? [...navItems, ...financeItems, ...adminOnlyItems] :
-    user?.role === 'finance' ? [...navItems, ...financeItems] :
+    user?.role === 'super_admin' ? [...navItems, ...adminItems, ...superAdminItems] :
+    user?.role === 'admin'       ? [...navItems, ...adminItems] :
     navItems
 
   return (
@@ -69,13 +69,14 @@ export default function Sidebar() {
           </div>
           <div className="min-w-0">
             <p className="text-white text-sm font-medium truncate">{user?.display_name}</p>
-            <p className="text-white/50 text-xs capitalize">{user?.role}</p>
+            <p className="text-white/50 text-xs capitalize">
+              {user?.role === 'super_admin' ? 'Super Admin' :
+               user?.role === 'admin'       ? 'Admin' :
+               user?.role === 'user'        ? 'CC Owner' : user?.role}
+            </p>
           </div>
         </div>
-        <button
-          onClick={logout}
-          className="w-full text-left text-white/60 hover:text-white text-xs py-1 transition-colors"
-        >
+        <button onClick={logout} className="w-full text-left text-white/60 hover:text-white text-xs py-1 transition-colors">
           Sign out →
         </button>
       </div>
