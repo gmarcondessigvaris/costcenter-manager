@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { listVendors, createVendor, updateVendor, archiveVendor, restoreVendor } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
@@ -42,7 +42,7 @@ function VendorForm({
           disabled={!name.trim() || isPending}
           className="btn-primary"
         >
-          {isPending ? 'Savingâ€¦' : initial ? 'Save Changes' : 'Create Vendor'}
+          {isPending ? 'Saving…' : initial ? 'Save Changes' : 'Create Vendor'}
         </button>
         <button onClick={onCancel} className="btn-secondary">Cancel</button>
       </div>
@@ -186,7 +186,7 @@ export default function VendorsPage() {
       <div className="flex gap-3 mb-4">
         <input
           className="input max-w-sm"
-          placeholder="Search vendorsâ€¦"
+          placeholder="Search vendors…"
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
@@ -202,12 +202,12 @@ export default function VendorsPage() {
       </div>
 
       {isLoading ? (
-        <p className="text-gray-400">Loadingâ€¦</p>
+        <p className="text-gray-400">Loading…</p>
       ) : (
         <div className="space-y-3">
           {active.length === 0 && !showArchived && (
             <div className="card text-center py-12 text-gray-400">
-              No vendors yet â€” create one above.
+              No vendors yet — create one above.
             </div>
           )}
 
