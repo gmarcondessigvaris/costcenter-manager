@@ -129,3 +129,7 @@ export const getInvoicePdfUrl = (id: string) => `/api/invoices/${id}/pdf`
 // ── Accounts & ITR codes ──────────────────────────────────────────────────────
 export const listAccounts = () => api.get<Account[]>('/accounts').then(r => r.data)
 export const listItrCodes = () => api.get<ItrCode[]>('/itr-codes').then(r => r.data)
+
+// ── Reports ───────────────────────────────────────────────────────────────────
+export const getCostCenterReport = (ccId: string, fiscalYear: string) =>
+  api.get(`/reports/cost-centers/${ccId}`, { params: { fiscal_year: fiscalYear } }).then(r => r.data)
