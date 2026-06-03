@@ -6,15 +6,21 @@ import { Navigate } from 'react-router-dom'
 import type { UserRole } from '../types'
 
 const ROLE_COLORS: Record<UserRole, string> = {
-  admin: 'bg-purple-100 text-purple-700',
-  finance: 'bg-blue-100 text-blue-700',
-  user: 'bg-gray-100 text-gray-600',
+  super_admin: 'bg-purple-100 text-purple-700',
+  admin:       'bg-blue-100 text-blue-700',
+  user:        'bg-gray-100 text-gray-600',
+}
+
+const ROLE_LABELS: Record<UserRole, string> = {
+  super_admin: 'Super Admin',
+  admin:       'Admin',
+  user:        'CC Owner',
 }
 
 function CreateUserForm({ onCreated }: { onCreated: () => void }) {
-  const [name, setName] = useState('')
+  const [name,  setName]  = useState('')
   const [email, setEmail] = useState('')
-  const [role, setRole] = useState('user')
+  const [role,  setRole]  = useState('user')
   const [error, setError] = useState('')
 
   const createMut = useMutation({
@@ -29,45 +35,29 @@ function CreateUserForm({ onCreated }: { onCreated: () => void }) {
       <div className="grid grid-cols-3 gap-4">
         <div>
           <label className="label">Full Name *</label>
-          <input
-            type="text"
-            className="input"
-            placeholder="e.g. Maria Silva"
-            value={name}
-            onChange={e => setName(e.target.value)}
-          />
+          <input type="text" className="input" placeholder="e.g. Maria Silva"
+            value={name} onChange={e => setName(e.target.value)} />
         </div>
         <div>
           <label className="label">Email *</label>
-          <input
-            type="email"
-            className="input"
-            placeholder="e.g. maria.silva@sigvaris.com"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-          />
+          <input type="email" className="input" placeholder="e.g. maria.silva@sigvaris.com"
+            value={email} onChange={e => setEmail(e.target.value)} />
         </div>
         <div>
           <label className="label">Role</label>
           <select className="input" value={role} onChange={e => setRole(e.target.value)}>
-            <option value="user">User</option>
-            <option value="finance">Finance</option>
+            <option value="user">CC Owner</option>
             <option value="admin">Admin</option>
+            <option value="super_admin">Super Admin</option>
           </select>
         </div>
       </div>
       {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
       <div className="mt-4">
-        <button
-          onClick={() => createMut.mutate()}
-          disabled={!name.trim() || !email.trim() || createMut.isPending}
-          className="btn-primary"
-        >
+        <button onClick={() => createMut.mutate()} disabled={!name.trim() || !email.trim() || createMut.isPending} className="btn-primary">
           {createMut.isPending ? 'Creating…' : 'Create User'}
         </button>
-        <p className="text-xs text-gray-400 mt-2">
-          The user signs in with this email on the login page to access the app.
-        </p>
+        <p className="text-xs text-gray-400 mt-2">The user signs in with this email on the login page to access the app.</p>
       </div>
     </div>
   )
@@ -77,19 +67,14 @@ export default function AdminPage() {
   const { user, loading } = useAuth()
   const qc = useQueryClient()
 
-  // All hooks must be called before any conditional return
-  const { data: users = [], isLoading } = useQuery({
-    queryKey: ['users'],
-    queryFn: listUsers,
-  })
-
+  const { data: users = [], isLoading } = useQuery({ queryKey: ['users'], queryFn: listUsers })
   const roleMut = useMutation({
     mutationFn: ({ id, role }: { id: string; role: string }) => updateUserRole(id, role),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
   })
 
   if (loading) return <div className="p-8 text-gray-400">Loading…</div>
-  if (user?.role !== 'admin') return <Navigate to="/dashboard" replace />
+  if (user?.role !== 'super_admin') return <Navigate to="/dashboard" replace />
 
   return (
     <div>
@@ -126,20 +111,17 @@ export default function AdminPage() {
                   </td>
                   <td className="px-6 py-4 text-gray-500">{u.email}</td>
                   <td className="px-6 py-4">
-                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${ROLE_COLORS[u.role]}`}>
-                      {u.role}
+                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${ROLE_COLORS[u.role] ?? 'bg-gray-100 text-gray-600'}`}>
+                      {ROLE_LABELS[u.role] ?? u.role}
                     </span>
                   </td>
                   <td className="px-6 py-4">
                     {u.id !== user.id && (
-                      <select
-                        className="input w-32 text-xs py-1"
-                        value={u.role}
-                        onChange={e => roleMut.mutate({ id: u.id, role: e.target.value })}
-                      >
-                        <option value="user">user</option>
-                        <option value="finance">finance</option>
-                        <option value="admin">admin</option>
+                      <select className="input w-36 text-xs py-1" value={u.role}
+                        onChange={e => roleMut.mutate({ id: u.id, role: e.target.value })}>
+                        <option value="user">CC Owner</option>
+                        <option value="admin">Admin</option>
+                        <option value="super_admin">Super Admin</option>
                       </select>
                     )}
                   </td>
