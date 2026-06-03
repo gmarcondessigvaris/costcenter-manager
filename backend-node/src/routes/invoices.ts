@@ -80,7 +80,7 @@ async function getInvoice(id: string) {
 }
 
 async function assertMemberAccess(invoiceCostCenterId: string, user: AuthRequest['user'], res: ReturnType<Router['use']> extends never ? never : Parameters<Parameters<Router['use']>[0]>[1]): Promise<boolean> {
-  if (user.role === 'admin' || user.role === 'finance') return true
+  if (user.role === 'super_admin' || user.role === 'admin') return true
   const m = await queryOne(
     'SELECT id FROM cost_center_members WHERE cost_center_id = $1 AND user_id = $2',
     [invoiceCostCenterId, user.id]
@@ -101,7 +101,7 @@ async function assertMemberAccess(invoiceCostCenterId: string, user: AuthRequest
 
 router.post('/invoices', authMiddleware, upload.single('file'), async (req, res) => {
   const actor = (req as AuthRequest).user
-  if (actor.role !== 'finance' && actor.role !== 'admin') {
+  if (actor.role !== 'admin' && actor.role !== 'super_admin') {
     res.status(403).json({ detail: 'Finance role required' }); return
   }
 
@@ -134,7 +134,7 @@ router.get('/invoices', authMiddleware, async (req, res) => {
   let sql = 'SELECT i.id FROM invoices i WHERE 1=1'
   const params: unknown[] = []
 
-  if (actor.role !== 'admin' && actor.role !== 'finance') {
+  if (actor.role !== 'super_admin' && actor.role !== 'admin') {
     // Cost center members see all their invoices.
     // Approvers only see an invoice when it is their turn:
     // their step is pending AND all prior steps are already approved.
