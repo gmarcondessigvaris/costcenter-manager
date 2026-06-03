@@ -82,7 +82,12 @@ export default function DashboardPage() {
                   <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 text-xs font-bold">PDF</div>
                   <div>
                     <p className="text-sm font-semibold text-gray-900">{inv.vendor.name}</p>
-                    <p className="text-xs text-gray-400">Uploaded {format(new Date(inv.created_at), 'dd MMM yyyy')} by {inv.uploaded_by.display_name}</p>
+                    <p className="text-xs text-gray-400">
+                      {inv.cost_center && (
+                        <span className="font-medium text-sigvaris-blue mr-1">{inv.cost_center.code}</span>
+                      )}
+                      Uploaded {format(new Date(inv.created_at), 'dd MMM yyyy')} by {inv.uploaded_by.display_name}
+                    </p>
                   </div>
                 </div>
                 <span className="text-blue-600 text-xs font-medium">Process →</span>
@@ -105,7 +110,14 @@ export default function DashboardPage() {
                 className="flex items-center justify-between p-3 rounded-lg border border-yellow-100 bg-yellow-50/50 hover:bg-yellow-50 transition-colors"
               >
                 <div>
-                  <p className="text-sm font-semibold text-gray-900">{inv.vendor.name}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-gray-900">{inv.vendor.name}</p>
+                    {inv.cost_center && (
+                      <span className="text-xs bg-sigvaris-blue-pale text-sigvaris-blue px-1.5 py-0.5 rounded font-mono">
+                        {inv.cost_center.code}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-gray-400">
                     {inv.amount
                       ? Number(inv.amount).toLocaleString('de-CH', { style: 'currency', currency: 'CHF' })
