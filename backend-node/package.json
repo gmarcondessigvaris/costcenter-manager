@@ -1,0 +1,32 @@
+{
+  "name": "costcenter-backend-node",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node --experimental-strip-types --watch src/index.ts",
+    "start": "node --experimental-strip-types src/index.ts",
+    "db:init": "node --experimental-strip-types src/db-init.ts"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "exceljs": "^4.4.0",
+    "jsonwebtoken": "^9.0.2",
+    "jwks-rsa": "^3.1.0",
+    "multer": "^1.4.5-lts.1",
+    "pg": "^8.13.1",
+    "uuid": "^11.0.5",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/multer": "^1.4.12",
+    "@types/pg": "^8.11.10",
+    "@types/uuid": "^10.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.2"
+  }
+}
