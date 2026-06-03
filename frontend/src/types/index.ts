@@ -65,6 +65,9 @@ export interface BudgetUpload {
 export interface Vendor {
   id: string
   name: string
+  description?: string
+  address?: string
+  is_active: boolean
 }
 
 export interface Project {
