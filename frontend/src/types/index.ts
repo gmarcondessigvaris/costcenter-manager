@@ -104,6 +104,7 @@ export interface Invoice {
   status: InvoiceStatus
   vendor: Vendor
   cost_center_id: string
+  cost_center?: { code: string; name: string }
   pdf_path?: string
   original_filename?: string
   amount?: number
