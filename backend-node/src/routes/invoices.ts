@@ -27,10 +27,12 @@ async function getInvoice(id: string) {
   const inv = await queryOne(
     `SELECT i.*,
             v.id AS vendor_id, v.name AS vendor_name,
-            u.id AS uploader_id, u.display_name AS uploader_name, u.email AS uploader_email, u.role AS uploader_role
+            u.id AS uploader_id, u.display_name AS uploader_name, u.email AS uploader_email, u.role AS uploader_role,
+            cc.code AS cost_center_code, cc.name AS cost_center_name
      FROM invoices i
-     JOIN vendors v ON v.id = i.vendor_id
-     JOIN users u ON u.id = i.uploaded_by_id
+     JOIN vendors v  ON v.id  = i.vendor_id
+     JOIN users u    ON u.id  = i.uploaded_by_id
+     JOIN cost_centers cc ON cc.id = i.cost_center_id
      WHERE i.id = $1`,
     [id]
   )
@@ -59,7 +61,9 @@ async function getInvoice(id: string) {
 
   return {
     id: inv.id, invoice_number: inv.invoice_number, status: inv.status,
-    cost_center_id: inv.cost_center_id, pdf_path: inv.pdf_path, original_filename: inv.original_filename,
+    cost_center_id: inv.cost_center_id,
+    cost_center: { code: inv.cost_center_code, name: inv.cost_center_name },
+    pdf_path: inv.pdf_path, original_filename: inv.original_filename,
     amount: inv.amount, due_date: inv.due_date, notes: inv.notes, created_at: inv.created_at,
     vendor: { id: inv.vendor_id, name: inv.vendor_name },
     uploaded_by: { id: inv.uploader_id, display_name: inv.uploader_name, email: inv.uploader_email, role: inv.uploader_role },
@@ -131,10 +135,26 @@ router.get('/invoices', authMiddleware, async (req, res) => {
   const params: unknown[] = []
 
   if (actor.role !== 'admin' && actor.role !== 'finance') {
-    sql += ` AND (i.cost_center_id IN (
-               SELECT cost_center_id FROM cost_center_members WHERE user_id = $${params.length + 1})
-             OR i.id IN (
-               SELECT invoice_id FROM approval_steps WHERE approver_id = $${params.length + 1}))`
+    // Cost center members see all their invoices.
+    // Approvers only see an invoice when it is their turn:
+    // their step is pending AND all prior steps are already approved.
+    sql += ` AND (
+      i.cost_center_id IN (
+        SELECT cost_center_id FROM cost_center_members WHERE user_id = $${params.length + 1}
+      )
+      OR i.id IN (
+        SELECT aps.invoice_id
+        FROM approval_steps aps
+        WHERE aps.approver_id = $${params.length + 1}
+          AND aps.status = 'pending'
+          AND NOT EXISTS (
+            SELECT 1 FROM approval_steps prior
+            WHERE prior.invoice_id = aps.invoice_id
+              AND prior.step_order < aps.step_order
+              AND prior.status = 'pending'
+          )
+      )
+    )`
     params.push(actor.id)
   }
   if (status) { params.push(status); sql += ` AND i.status = $${params.length}` }
@@ -165,7 +185,10 @@ router.get('/invoices/:id/pdf', authMiddleware, async (req, res) => {
   if (!await assertMemberAccess(inv.cost_center_id as string, actor, res)) return
   const filePath = inv.pdf_path as string
   if (!filePath || !fs.existsSync(filePath)) { res.status(404).json({ detail: 'PDF not found on disk' }); return }
-  res.download(filePath, (inv.original_filename as string) ?? 'invoice.pdf')
+  const filename = (inv.original_filename as string) ?? 'invoice.pdf'
+  res.setHeader('Content-Type', 'application/pdf')
+  res.setHeader('Content-Disposition', `inline; filename="${filename}"`)
+  res.sendFile(path.resolve(filePath))
 })
 
 // â”€â”€ Suggestions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -189,11 +212,13 @@ router.put('/invoices/:id/assign', authMiddleware, async (req, res) => {
   }
 
   const { amount, due_date, notes, allocations, approver_1_id, approver_2_id,
-          currency = 'CHF', exchange_rate_mode = 'auto', exchange_rate: manualRate } = req.body as {
+          currency = 'CHF', exchange_rate_mode = 'auto', exchange_rate: manualRate,
+          auto_approve_first_step = false } = req.body as {
     amount: number; due_date: string; notes?: string
     currency?: string; exchange_rate_mode?: string; exchange_rate?: number
     allocations: Array<{ budget_line_id?: string; project_id?: string; amount: number; notes?: string }>
     approver_1_id: string; approver_2_id: string
+    auto_approve_first_step?: boolean
   }
 
   if (!allocations?.length) { res.status(400).json({ detail: 'At least one allocation required' }); return }
@@ -230,7 +255,16 @@ router.put('/invoices/:id/assign', authMiddleware, async (req, res) => {
       )
     }
     await q('DELETE FROM approval_steps WHERE invoice_id = $1', [inv.id])
-    await q('INSERT INTO approval_steps (invoice_id, approver_id, step_order) VALUES ($1,$2,1)', [inv.id, approver_1_id])
+    // If the owner is also approver 1, mark step 1 as pre-approved immediately
+    if (auto_approve_first_step) {
+      await q(
+        `INSERT INTO approval_steps (invoice_id, approver_id, step_order, status, decided_at)
+         VALUES ($1,$2,1,'approved',NOW())`,
+        [inv.id, approver_1_id]
+      )
+    } else {
+      await q('INSERT INTO approval_steps (invoice_id, approver_id, step_order) VALUES ($1,$2,1)', [inv.id, approver_1_id])
+    }
     await q('INSERT INTO approval_steps (invoice_id, approver_id, step_order) VALUES ($1,$2,2)', [inv.id, approver_2_id])
   })
 
