@@ -1,4 +1,4 @@
-import { Router } from 'express'
+﻿import { Router } from 'express'
 import { authMiddleware } from '../middleware/auth.ts'
 import { query, queryOne } from '../db.ts'
 import type { AuthRequest } from '../types.ts'
@@ -11,7 +11,7 @@ router.get('/reports/cost-centers/:id', authMiddleware, async (req, res) => {
   const fiscalYear = (req.query.fiscal_year as string) || new Date().getFullYear().toString()
 
   // Access check
-  if (user.role !== 'admin' && user.role !== 'finance') {
+  if (user.role !== 'super_admin' && user.role !== 'admin') {
     const member = await queryOne(
       'SELECT id FROM cost_center_members WHERE cost_center_id = $1 AND user_id = $2',
       [ccId, user.id]
@@ -43,7 +43,7 @@ router.get('/reports/cost-centers/:id', authMiddleware, async (req, res) => {
     [ccId, fiscalYear]
   )
 
-  // All approved invoice allocations — amounts converted to CHF via exchange_rate
+  // All approved invoice allocations â€” amounts converted to CHF via exchange_rate
   const allocations = await query(
     `SELECT ia.id, ia.budget_line_id, ia.project_id,
             ia.amount,
