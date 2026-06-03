@@ -1,0 +1,2 @@
+ALTER TABLE vendors ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE vendors ADD COLUMN IF NOT EXISTS address     TEXT;
