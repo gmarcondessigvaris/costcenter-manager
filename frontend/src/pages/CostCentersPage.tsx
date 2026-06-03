@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   listCostCenters, createCostCenter, addMember, removeMember, searchUsers,
@@ -72,7 +72,7 @@ function AddMemberForm({ ccId }: { ccId: string }) {
       <input
         type="text"
         className="input text-sm"
-        placeholder="Search by name or emailâ€¦"
+        placeholder="Search by name or email…"
         value={q}
         onChange={e => setQ(e.target.value)}
       />
@@ -123,7 +123,7 @@ function CostCenterCard({ cc }: { cc: CostCenter }) {
           onClick={() => setExpanded(e => !e)}
           className="text-gray-400 hover:text-gray-600 text-xs"
         >
-          {expanded ? 'â–² Hide' : 'â–¼ Members'}
+          {expanded ? '▲ Hide' : '▼ Members'}
         </button>
       </div>
 
@@ -204,10 +204,10 @@ export default function CostCentersPage() {
       )}
 
       {isLoading ? (
-        <p className="text-gray-400">Loadingâ€¦</p>
+        <p className="text-gray-400">Loading…</p>
       ) : costCenters.length === 0 ? (
         <div className="card text-center py-12 text-gray-400">
-          No cost centers yet{isAdmin ? ' â€” create one above' : ''}
+          No cost centers yet{isAdmin ? ' — create one above' : ''}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
