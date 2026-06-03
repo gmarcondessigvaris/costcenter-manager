@@ -6,46 +6,89 @@ import {
 } from '@azure/msal-browser'
 import { MsalProvider, useMsal } from '@azure/msal-react'
 import React, { createContext, useContext, useEffect, useState } from 'react'
+import axios from 'axios'
 import { getMe, setAuthToken } from '../services/api'
 import type { User } from '../types'
 
+const DEV_AUTH = import.meta.env.VITE_DEV_AUTH === 'true'
+
 const TENANT_ID = import.meta.env.VITE_AZURE_TENANT_ID as string
 const CLIENT_ID = import.meta.env.VITE_AZURE_CLIENT_ID as string
-
-const msalConfig: Configuration = {
-  auth: {
-    clientId: CLIENT_ID,
-    authority: `https://login.microsoftonline.com/${TENANT_ID}`,
-    redirectUri: window.location.origin,
-  },
-  cache: { cacheLocation: 'sessionStorage' },
-}
-
-export const msalInstance = new PublicClientApplication(msalConfig)
-
-const SCOPES = [`api://${CLIENT_ID}/user_impersonation`]
 
 // ── Context ───────────────────────────────────────────────────────────────────
 
 interface AuthCtx {
   user: User | null
   loading: boolean
-  login: () => Promise<void>
+  login: (opts?: { email?: string; displayName?: string }) => Promise<void>
   logout: () => void
 }
 
 const AuthContext = createContext<AuthCtx>({
-  user: null,
-  loading: true,
-  login: async () => {},
-  logout: () => {},
+  user: null, loading: true, login: async () => {}, logout: () => {},
 })
 
 export function useAuth() {
   return useContext(AuthContext)
 }
 
-function AuthInner({ children }: { children: React.ReactNode }) {
+// ── Dev auth provider (no MSAL) ───────────────────────────────────────────────
+
+function DevAuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const token = localStorage.getItem('dev_token')
+    if (token) {
+      setAuthToken(token)
+      getMe()
+        .then(setUser)
+        .catch(() => { localStorage.removeItem('dev_token'); setAuthToken(null) })
+        .finally(() => setLoading(false))
+    } else {
+      setLoading(false)
+    }
+  }, [])
+
+  async function login(opts?: { email?: string; displayName?: string }) {
+    const { data } = await axios.post('/api/auth/dev-login', {
+      email: opts?.email,
+      display_name: opts?.displayName,
+    })
+    localStorage.setItem('dev_token', data.token)
+    setAuthToken(data.token)
+    setUser(data.user)
+  }
+
+  function logout() {
+    localStorage.removeItem('dev_token')
+    setAuthToken(null)
+    setUser(null)
+  }
+
+  return (
+    <AuthContext.Provider value={{ user, loading, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  )
+}
+
+// ── Azure AD provider (MSAL) ──────────────────────────────────────────────────
+
+const msalConfig: Configuration = {
+  auth: {
+    clientId: CLIENT_ID ?? '',
+    authority: `https://login.microsoftonline.com/${TENANT_ID ?? ''}`,
+    redirectUri: window.location.origin,
+  },
+  cache: { cacheLocation: 'sessionStorage' },
+}
+
+export const msalInstance = new PublicClientApplication(msalConfig)
+const SCOPES = [`api://${CLIENT_ID}/user_impersonation`]
+
+function AzureAuthInner({ children }: { children: React.ReactNode }) {
   const { instance, accounts } = useMsal()
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
@@ -53,10 +96,7 @@ function AuthInner({ children }: { children: React.ReactNode }) {
   async function acquireToken(): Promise<string | null> {
     if (!accounts[0]) return null
     try {
-      const result: AuthenticationResult = await instance.acquireTokenSilent({
-        scopes: SCOPES,
-        account: accounts[0],
-      })
+      const result: AuthenticationResult = await instance.acquireTokenSilent({ scopes: SCOPES, account: accounts[0] })
       return result.accessToken
     } catch (e) {
       if (e instanceof InteractionRequiredAuthError) {
@@ -72,15 +112,7 @@ function AuthInner({ children }: { children: React.ReactNode }) {
       await msalInstance.initialize()
       if (accounts.length > 0) {
         const token = await acquireToken()
-        if (token) {
-          setAuthToken(token)
-          try {
-            const me = await getMe()
-            setUser(me)
-          } catch {
-            setUser(null)
-          }
-        }
+        if (token) { setAuthToken(token); try { setUser(await getMe()) } catch { setUser(null) } }
       }
       setLoading(false)
     }
@@ -90,18 +122,10 @@ function AuthInner({ children }: { children: React.ReactNode }) {
   async function login() {
     await instance.loginPopup({ scopes: SCOPES })
     const token = await acquireToken()
-    if (token) {
-      setAuthToken(token)
-      const me = await getMe()
-      setUser(me)
-    }
+    if (token) { setAuthToken(token); setUser(await getMe()) }
   }
 
-  function logout() {
-    setAuthToken(null)
-    setUser(null)
-    instance.logoutPopup()
-  }
+  function logout() { setAuthToken(null); setUser(null); instance.logoutPopup() }
 
   return (
     <AuthContext.Provider value={{ user, loading, login, logout }}>
@@ -110,10 +134,13 @@ function AuthInner({ children }: { children: React.ReactNode }) {
   )
 }
 
+// ── Root provider ─────────────────────────────────────────────────────────────
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  if (DEV_AUTH) return <DevAuthProvider>{children}</DevAuthProvider>
   return (
     <MsalProvider instance={msalInstance}>
-      <AuthInner>{children}</AuthInner>
+      <AzureAuthInner>{children}</AzureAuthInner>
     </MsalProvider>
   )
 }
