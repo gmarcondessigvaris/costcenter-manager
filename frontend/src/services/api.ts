@@ -1,7 +1,7 @@
 import axios from 'axios'
 import type {
-  AuditEntry, BudgetLine, BudgetUpload, CostCenter,
-  Invoice, InvoiceSuggestion, Project, User, Vendor,
+  Account, AuditEntry, BudgetLine, BudgetUpload, CostCenter,
+  Invoice, InvoiceSuggestion, ItrCode, Project, User, Vendor,
 } from '../types'
 
 const api = axios.create({ baseURL: '/api' })
@@ -125,3 +125,7 @@ export const getInvoiceAuditLog = (id: string) =>
   api.get<AuditEntry[]>(`/invoices/${id}/audit-log`).then(r => r.data)
 
 export const getInvoicePdfUrl = (id: string) => `/api/invoices/${id}/pdf`
+
+// ── Accounts & ITR codes ──────────────────────────────────────────────────────
+export const listAccounts = () => api.get<Account[]>('/accounts').then(r => r.data)
+export const listItrCodes = () => api.get<ItrCode[]>('/itr-codes').then(r => r.data)
