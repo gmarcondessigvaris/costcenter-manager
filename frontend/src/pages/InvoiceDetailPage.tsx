@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm, useFieldArray } from 'react-hook-form'
-import { format } from 'date-fns'
+import { format, differenceInDays } from 'date-fns'
 import {
   getInvoice, listBudgetLines, listProjects, searchUsers,
   assignInvoice, approveInvoice, rejectInvoice,
@@ -11,6 +11,8 @@ import {
 } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import type { ApprovalStep, InvoiceSuggestion, User } from '../types'
+
+const CHF = (n: number) => n.toLocaleString('de-CH', { style: 'currency', currency: 'CHF' })
 
 // ── Approval timeline ─────────────────────────────────────────────────────────
 
@@ -21,8 +23,7 @@ function ApprovalTimeline({ steps }: { steps: ApprovalStep[] }) {
         <div key={step.id} className="flex items-start gap-3">
           <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
             step.status === 'approved' ? 'bg-green-100 text-green-700' :
-            step.status === 'rejected' ? 'bg-red-100 text-red-700' :
-            'bg-gray-100 text-gray-500'
+            step.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'
           }`}>
             {step.status === 'approved' ? '✓' : step.status === 'rejected' ? '✗' : i + 1}
           </div>
@@ -30,9 +31,7 @@ function ApprovalTimeline({ steps }: { steps: ApprovalStep[] }) {
             <p className="text-sm font-medium text-gray-900">{step.approver.display_name}</p>
             <p className="text-xs text-gray-400 capitalize">{step.status}</p>
             {step.comment && <p className="text-xs text-gray-600 italic mt-0.5">"{step.comment}"</p>}
-            {step.decided_at && (
-              <p className="text-xs text-gray-400">{format(new Date(step.decided_at), 'dd MMM yyyy')}</p>
-            )}
+            {step.decided_at && <p className="text-xs text-gray-400">{format(new Date(step.decided_at), 'dd MMM yyyy')}</p>}
           </div>
         </div>
       ))}
@@ -40,47 +39,34 @@ function ApprovalTimeline({ steps }: { steps: ApprovalStep[] }) {
   )
 }
 
-// ── User search input ─────────────────────────────────────────────────────────
+// ── User search ───────────────────────────────────────────────────────────────
 
 function UserSearch({ label, value, onChange }: { label: string; value: User | null; onChange: (u: User) => void }) {
   const [q, setQ] = useState('')
   const [open, setOpen] = useState(false)
-
   const { data: results = [] } = useQuery({
     queryKey: ['user-search', q],
     queryFn: () => searchUsers(q),
     enabled: q.length >= 2,
   })
-
   return (
     <div className="relative">
       <label className="label">{label}</label>
       {value ? (
         <div className="flex items-center gap-2 p-2 border border-gray-200 rounded-lg bg-gray-50">
-          <div className="w-6 h-6 rounded-full bg-sigvaris-blue text-white text-xs flex items-center justify-center font-bold">
-            {value.display_name[0]}
-          </div>
+          <div className="w-6 h-6 rounded-full bg-sigvaris-blue text-white text-xs flex items-center justify-center font-bold">{value.display_name[0]}</div>
           <span className="text-sm flex-1">{value.display_name}</span>
           <button type="button" onClick={() => { onChange(null as any); setQ('') }} className="text-gray-400 hover:text-gray-600 text-xs">×</button>
         </div>
       ) : (
         <div className="relative">
-          <input
-            type="text"
-            className="input"
-            placeholder="Search by name or email…"
-            value={q}
-            onChange={e => { setQ(e.target.value); setOpen(true) }}
-            onFocus={() => setOpen(true)}
-          />
+          <input type="text" className="input" placeholder="Search by name or email…" value={q}
+            onChange={e => { setQ(e.target.value); setOpen(true) }} onFocus={() => setOpen(true)} />
           {open && results.length > 0 && (
             <ul className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
               {results.map(u => (
-                <li
-                  key={u.id}
-                  className="px-3 py-2 text-sm hover:bg-sigvaris-blue-pale cursor-pointer"
-                  onMouseDown={() => { onChange(u); setQ(''); setOpen(false) }}
-                >
+                <li key={u.id} className="px-3 py-2 text-sm hover:bg-sigvaris-blue-pale cursor-pointer"
+                  onMouseDown={() => { onChange(u); setQ(''); setOpen(false) }}>
                   <span className="font-medium">{u.display_name}</span>
                   <span className="text-gray-400 ml-2">{u.email}</span>
                 </li>
@@ -95,53 +81,52 @@ function UserSearch({ label, value, onChange }: { label: string; value: User | n
 
 // ── Assignment form ───────────────────────────────────────────────────────────
 
-interface AllocationRow {
-  type: 'budget_line' | 'project'
-  target_id: string
-  amount: string
-  notes: string
-}
-
-interface AssignForm {
-  amount: string
-  due_date: string
-  notes: string
-  allocations: AllocationRow[]
-}
+interface AllocationRow { type: 'budget_line' | 'project'; target_id: string; amount: string; notes: string }
+interface AssignForm   { amount: string; invoice_date: string; notes: string; allocations: AllocationRow[] }
 
 function AssignmentForm({ invoiceId, costCenterId, onDone }: {
-  invoiceId: string
-  costCenterId: string
-  onDone: () => void
+  invoiceId: string; costCenterId: string; onDone: () => void
 }) {
   const qc = useQueryClient()
   const [approver1, setApprover1] = useState<User | null>(null)
   const [approver2, setApprover2] = useState<User | null>(null)
-  const [error, setError] = useState('')
-  const [currency, setCurrency] = useState('CHF')
+  const [error, setError]         = useState('')
+  const [currency, setCurrency]   = useState('CHF')
 
-  const { data: budgetLines = [] } = useQuery({
-    queryKey: ['budget-lines', costCenterId],
-    queryFn: () => listBudgetLines(costCenterId),
-  })
-  const { data: projects = [] } = useQuery({
-    queryKey: ['projects', costCenterId],
-    queryFn: () => listProjects(costCenterId),
-  })
-  const { data: currencies = [] } = useQuery({
-    queryKey: ['currencies'],
-    queryFn: listCurrencies,
-  })
+  const { data: budgetLines = [] } = useQuery({ queryKey: ['budget-lines', costCenterId], queryFn: () => listBudgetLines(costCenterId) })
+  const { data: projects = [] }    = useQuery({ queryKey: ['projects', costCenterId],     queryFn: () => listProjects(costCenterId) })
+  const { data: currencies = [] }  = useQuery({ queryKey: ['currencies'],                 queryFn: listCurrencies })
+  const { data: suggestions = [] } = useQuery({ queryKey: ['suggestions', invoiceId],    queryFn: () => getInvoiceSuggestions(invoiceId) })
+
   const activeCurrencies = (currencies as any[]).filter((c: any) => c.is_active)
-  const { data: suggestions = [] } = useQuery({
-    queryKey: ['suggestions', invoiceId],
-    queryFn: () => getInvoiceSuggestions(invoiceId),
-  })
 
   const { register, control, handleSubmit, watch, setValue } = useForm<AssignForm>({
-    defaultValues: { amount: '', due_date: '', notes: '', allocations: [{ type: 'budget_line', target_id: '', amount: '', notes: '' }] },
+    defaultValues: { amount: '', invoice_date: '', notes: '', allocations: [{ type: 'budget_line', target_id: '', amount: '', notes: '' }] },
   })
   const { fields, append, remove } = useFieldArray({ control, name: 'allocations' })
+
+  // ── Auto-fill: single allocation mirrors invoice amount ───────────────────
+  const watchedAmount = watch('amount')
+  useEffect(() => {
+    if (fields.length === 1 && watchedAmount) {
+      setValue('allocations.0.amount', watchedAmount)
+    }
+  }, [watchedAmount, fields.length])
+
+  // ── Running total ─────────────────────────────────────────────────────────
+  const allAllocAmounts = watch('allocations').map(a => parseFloat(a.amount) || 0)
+  const totalAllocated  = allAllocAmounts.reduce((s, a) => s + a, 0)
+  const invoiceTotal    = parseFloat(watchedAmount) || 0
+  const remaining       = invoiceTotal - totalAllocated
+  const multiLine       = fields.length > 1
+
+  // ── Invoice date warning ──────────────────────────────────────────────────
+  const watchedDate    = watch('invoice_date')
+  const dateWarning    = useMemo(() => {
+    if (!watchedDate) return null
+    const days = differenceInDays(new Date(), new Date(watchedDate))
+    return days > 30 ? `This invoice date is ${days} days ago — please verify it is correct.` : null
+  }, [watchedDate])
 
   const assignMut = useMutation({
     mutationFn: (data: Parameters<typeof assignInvoice>[1]) => assignInvoice(invoiceId, data),
@@ -159,17 +144,23 @@ function AssignmentForm({ invoiceId, costCenterId, onDone }: {
     if (!approver1 || !approver2) return setError('Please select both approvers')
     if (approver1.id === approver2.id) return setError('Approvers must be different people')
 
+    // Validate allocation sum
+    if (multiLine && invoiceTotal > 0) {
+      const diff = Math.abs(remaining)
+      if (diff > 0.01) return setError(`Allocation total (${CHF(totalAllocated)}) must equal invoice amount (${CHF(invoiceTotal)})`)
+    }
+
     const allocations = form.allocations.map(a => ({
       budget_line_id: a.type === 'budget_line' ? a.target_id : undefined,
-      project_id: a.type === 'project' ? a.target_id : undefined,
+      project_id:     a.type === 'project'     ? a.target_id : undefined,
       amount: parseFloat(a.amount),
-      notes: a.notes || undefined,
+      notes:  a.notes || undefined,
     }))
 
     assignMut.mutate({
-      amount: parseFloat(form.amount),
-      due_date: form.due_date,
-      notes: form.notes || undefined,
+      amount:    parseFloat(form.amount),
+      due_date:  form.invoice_date,
+      notes:     form.notes || undefined,
       currency,
       allocations,
       approver_1_id: approver1.id,
@@ -179,17 +170,15 @@ function AssignmentForm({ invoiceId, costCenterId, onDone }: {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+
+      {/* Suggestions */}
       {suggestions.length > 0 && (
         <div className="bg-sigvaris-blue-pale rounded-lg p-3">
           <p className="text-xs font-semibold text-sigvaris-blue mb-2">💡 Suggested budget lines based on past invoices</p>
           <div className="flex flex-wrap gap-2">
             {suggestions.map(s => (
-              <button
-                key={s.budget_line_id}
-                type="button"
-                onClick={() => applySuggestion(s)}
-                className="text-xs px-3 py-1.5 bg-white border border-sigvaris-blue/20 rounded-full text-sigvaris-blue hover:bg-sigvaris-blue hover:text-white transition-colors"
-              >
+              <button key={s.budget_line_id} type="button" onClick={() => applySuggestion(s)}
+                className="text-xs px-3 py-1.5 bg-white border border-sigvaris-blue/20 rounded-full text-sigvaris-blue hover:bg-sigvaris-blue hover:text-white transition-colors">
                 {s.budget_line_code} – {s.budget_line_name}
                 <span className="ml-1 opacity-60">{Math.round(s.confidence * 100)}%</span>
               </button>
@@ -198,30 +187,26 @@ function AssignmentForm({ invoiceId, costCenterId, onDone }: {
         </div>
       )}
 
+      {/* Amount + Invoice Date */}
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="label">Amount *</label>
           <div className="flex gap-2">
-            <select
-              className="input w-28 shrink-0"
-              value={currency}
-              onChange={e => setCurrency(e.target.value)}
-            >
-              {activeCurrencies.map((c: any) => (
-                <option key={c.code} value={c.code}>{c.code}</option>
-              ))}
+            <select className="input w-28 shrink-0" value={currency} onChange={e => setCurrency(e.target.value)}>
+              {activeCurrencies.map((c: any) => <option key={c.code} value={c.code}>{c.code}</option>)}
             </select>
             <input type="number" step="0.01" className="input flex-1" required {...register('amount')} />
           </div>
-          {currency !== 'CHF' && (
-            <p className="text-xs text-gray-400 mt-1">
-              Will be converted to CHF automatically using the current exchange rate.
-            </p>
-          )}
+          {currency !== 'CHF' && <p className="text-xs text-gray-400 mt-1">Converted to CHF automatically.</p>}
         </div>
         <div>
-          <label className="label">Due Date *</label>
-          <input type="date" className="input" required {...register('due_date')} />
+          <label className="label">Invoice Date *</label>
+          <input type="date" className="input" required {...register('invoice_date')} />
+          {dateWarning && (
+            <p className="text-amber-600 text-xs mt-1 flex items-start gap-1">
+              <span>⚠️</span> {dateWarning}
+            </p>
+          )}
         </div>
       </div>
 
@@ -234,14 +219,12 @@ function AssignmentForm({ invoiceId, costCenterId, onDone }: {
       <div>
         <div className="flex items-center justify-between mb-2">
           <label className="label mb-0">Budget Allocations *</label>
-          <button
-            type="button"
-            onClick={() => append({ type: 'budget_line', target_id: '', amount: '', notes: '' })}
-            className="text-xs text-sigvaris-blue hover:underline"
-          >
+          <button type="button" onClick={() => append({ type: 'budget_line', target_id: '', amount: '', notes: '' })}
+            className="text-xs text-sigvaris-blue hover:underline">
             + Add line
           </button>
         </div>
+
         <div className="space-y-3">
           {fields.map((field, i) => (
             <div key={field.id} className="grid grid-cols-12 gap-2 items-end p-3 bg-gray-50 rounded-lg">
@@ -253,15 +236,12 @@ function AssignmentForm({ invoiceId, costCenterId, onDone }: {
                 </select>
               </div>
               <div className="col-span-5">
-                <label className="label text-xs">
-                  {watch(`allocations.${i}.type`) === 'budget_line' ? 'Budget Line' : 'Project'}
-                </label>
+                <label className="label text-xs">{watch(`allocations.${i}.type`) === 'budget_line' ? 'Budget Line' : 'Project'}</label>
                 <select className="input text-xs py-1.5" required {...register(`allocations.${i}.target_id`)}>
                   <option value="">Select…</option>
                   {watch(`allocations.${i}.type`) === 'budget_line'
                     ? budgetLines.map(bl => <option key={bl.id} value={bl.id}>{bl.code} – {bl.name}</option>)
-                    : projects.map(p => <option key={p.id} value={p.id}>{p.code} – {p.name}</option>)
-                  }
+                    : projects.map(p => <option key={p.id} value={p.id}>{p.code} – {p.name}</option>)}
                 </select>
               </div>
               <div className="col-span-2">
@@ -280,6 +260,24 @@ function AssignmentForm({ invoiceId, costCenterId, onDone }: {
             </div>
           ))}
         </div>
+
+        {/* Running total — only shown when multiple lines */}
+        {multiLine && invoiceTotal > 0 && (
+          <div className={`mt-2 p-3 rounded-lg text-sm flex items-center justify-between ${
+            Math.abs(remaining) < 0.01 ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'
+          }`}>
+            <span>
+              Allocated: <strong>{CHF(totalAllocated)}</strong> of <strong>{CHF(invoiceTotal)}</strong>
+            </span>
+            <span className="font-semibold">
+              {Math.abs(remaining) < 0.01
+                ? '✓ Balanced'
+                : remaining > 0
+                  ? `${CHF(remaining)} remaining`
+                  : `${CHF(Math.abs(remaining))} over`}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Approvers */}
@@ -300,13 +298,14 @@ function AssignmentForm({ invoiceId, costCenterId, onDone }: {
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function InvoiceDetailPage() {
-  const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
-  const { user } = useAuth()
-  const qc = useQueryClient()
-  const [tab, setTab] = useState<'detail' | 'audit'>('detail')
+  const { id }    = useParams<{ id: string }>()
+  const navigate  = useNavigate()
+  const { user }  = useAuth()
+  const qc        = useQueryClient()
+  const [tab, setTab]                   = useState<'detail' | 'audit'>('detail')
   const [rejectComment, setRejectComment] = useState('')
-  const [showReject, setShowReject] = useState(false)
+  const [showReject, setShowReject]       = useState(false)
+  const [showPdf, setShowPdf]             = useState(false)
 
   const { data: invoice, isLoading } = useQuery({
     queryKey: ['invoice', id],
@@ -324,233 +323,212 @@ export default function InvoiceDetailPage() {
     mutationFn: () => approveInvoice(id!),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['invoice', id] }),
   })
-
   const rejectMut = useMutation({
     mutationFn: () => rejectInvoice(id!, rejectComment),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['invoice', id] }); setShowReject(false) },
   })
 
   if (isLoading) return <div className="p-8 text-gray-400">Loading…</div>
-  if (!invoice) return <div className="p-8 text-gray-400">Invoice not found</div>
+  if (!invoice)  return <div className="p-8 text-gray-400">Invoice not found</div>
 
-  const myPendingStep = invoice.approval_steps.find(
-    s => s.approver.id === user?.id && s.status === 'pending'
-  )
-  const canApprove = !!myPendingStep && invoice.status === 'pending_approval'
-  const canAssign = invoice.status === 'pending_assignment'
+  const myPendingStep = invoice.approval_steps.find(s => s.approver.id === user?.id && s.status === 'pending')
+  const canApprove    = !!myPendingStep && invoice.status === 'pending_approval'
+  const canAssign     = invoice.status === 'pending_assignment'
 
   const statusColors: Record<string, string> = {
     pending_assignment: 'bg-blue-50 text-blue-700 border-blue-200',
-    pending_approval: 'bg-yellow-50 text-yellow-700 border-yellow-200',
-    approved: 'bg-green-50 text-green-700 border-green-200',
-    rejected: 'bg-red-50 text-red-700 border-red-200',
+    pending_approval:   'bg-yellow-50 text-yellow-700 border-yellow-200',
+    approved:           'bg-green-50 text-green-700 border-green-200',
+    rejected:           'bg-red-50 text-red-700 border-red-200',
+  }
+  const statusLabel: Record<string, string> = {
+    pending_assignment: 'New',
+    pending_approval:   'Pending Approval',
+    approved:           'Approved',
+    rejected:           'Rejected',
   }
 
   return (
-    <div className="max-w-5xl">
-      {/* Header */}
-      <div className="flex items-center gap-4 mb-6">
-        <button onClick={() => navigate(-1)} className="text-gray-400 hover:text-gray-700 text-sm">← Back</button>
-        <div className="flex-1">
-          <h1 className="text-xl font-bold text-gray-900">{invoice.vendor.name}</h1>
-          {invoice.invoice_number && <p className="text-gray-400 text-sm">{invoice.invoice_number}</p>}
+    <>
+      {/* ── PDF panel — fixed slide-in from right ─────────────────────────── */}
+      {showPdf && invoice.pdf_path && (
+        <div className="fixed top-0 right-0 bottom-0 w-1/2 bg-white shadow-2xl z-50 flex flex-col border-l border-gray-200">
+          <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between shrink-0">
+            <p className="text-sm font-medium text-gray-700 truncate">{invoice.original_filename ?? 'Invoice PDF'}</p>
+            <button onClick={() => setShowPdf(false)} className="text-gray-400 hover:text-gray-700 text-2xl leading-none ml-4 shrink-0">×</button>
+          </div>
+          <iframe src={getInvoicePdfUrl(invoice.id)} className="flex-1 w-full" title="Invoice PDF" />
         </div>
-        <span className={`px-3 py-1.5 rounded-full text-xs font-semibold border capitalize ${statusColors[invoice.status]}`}>
-          {invoice.status.replace(/_/g, ' ')}
-        </span>
-      </div>
+      )}
 
-      <div className="grid grid-cols-3 gap-6">
-        {/* Left: details */}
-        <div className="col-span-2 space-y-4">
-          {/* Invoice info */}
-          <div className="card">
-            <h2 className="font-semibold text-gray-900 mb-4">Invoice Details</h2>
-            <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-              <div>
-                <dt className="text-gray-400">Vendor</dt>
-                <dd className="font-medium">{invoice.vendor.name}</dd>
-              </div>
-              <div>
-                <dt className="text-gray-400">Uploaded by</dt>
-                <dd className="font-medium">{invoice.uploaded_by.display_name}</dd>
-              </div>
-              <div>
-                <dt className="text-gray-400">Upload date</dt>
-                <dd className="font-medium">{format(new Date(invoice.created_at), 'dd MMM yyyy')}</dd>
-              </div>
-              <div>
-                <dt className="text-gray-400">Amount</dt>
-                <dd className="font-medium">
-                  {invoice.amount
-                    ? Number(invoice.amount).toLocaleString('de-CH', { style: 'currency', currency: 'CHF' })
-                    : <span className="text-gray-300 font-normal">Not set</span>}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-gray-400">Due Date</dt>
-                <dd className="font-medium">
-                  {invoice.due_date ? format(new Date(invoice.due_date), 'dd MMM yyyy') : <span className="text-gray-300 font-normal">Not set</span>}
-                </dd>
-              </div>
-              {invoice.notes && (
-                <div className="col-span-2">
-                  <dt className="text-gray-400">Notes</dt>
-                  <dd className="font-medium">{invoice.notes}</dd>
+      <div className="max-w-5xl">
+        {/* Header */}
+        <div className="flex items-center gap-4 mb-6">
+          <button onClick={() => navigate(-1)} className="text-gray-400 hover:text-gray-700 text-sm">← Back</button>
+          <div className="flex-1">
+            <h1 className="text-xl font-bold text-gray-900">{invoice.vendor.name}</h1>
+            {invoice.invoice_number && <p className="text-gray-400 text-sm">{invoice.invoice_number}</p>}
+          </div>
+          <span className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${statusColors[invoice.status]}`}>
+            {statusLabel[invoice.status] ?? invoice.status}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-3 gap-6">
+          {/* Left */}
+          <div className="col-span-2 space-y-4">
+            {/* Invoice info */}
+            <div className="card">
+              <h2 className="font-semibold text-gray-900 mb-4">Invoice Details</h2>
+              <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                <div>
+                  <dt className="text-gray-400">Vendor</dt>
+                  <dd className="font-medium">{invoice.vendor.name}</dd>
                 </div>
-              )}
-            </dl>
-            {invoice.pdf_path && (
-              <div className="mt-4 pt-4 border-t border-gray-100">
-                <a
-                  href={getInvoicePdfUrl(invoice.id)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn-secondary text-xs"
-                >
-                  📄 View PDF — {invoice.original_filename}
-                </a>
-              </div>
-            )}
-          </div>
-
-          {/* Allocations */}
-          {invoice.allocations.length > 0 && (
-            <div className="card">
-              <h2 className="font-semibold text-gray-900 mb-4">Budget Allocations</h2>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-gray-400 text-xs border-b border-gray-100">
-                    <th className="pb-2 font-medium">Line / Project</th>
-                    <th className="pb-2 font-medium text-right">Amount</th>
-                    <th className="pb-2 font-medium">Notes</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {invoice.allocations.map(a => (
-                    <tr key={a.id}>
-                      <td className="py-2">
-                        {a.budget_line
-                          ? <><span className="font-mono text-xs text-gray-400">{a.budget_line.code}</span> {a.budget_line.name}</>
-                          : <span className="text-purple-700">📁 {a.project?.name}</span>}
-                      </td>
-                      <td className="py-2 text-right font-medium">
-                        {Number(a.amount).toLocaleString('de-CH', { style: 'currency', currency: 'CHF' })}
-                      </td>
-                      <td className="py-2 text-gray-400">{a.notes || '–'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Assignment form */}
-          {canAssign && (
-            <div className="card">
-              <h2 className="font-semibold text-gray-900 mb-4">Assign Invoice</h2>
-              <AssignmentForm
-                invoiceId={invoice.id}
-                costCenterId={invoice.cost_center_id}
-                onDone={() => {}}
-              />
-            </div>
-          )}
-
-          {/* Audit log tab */}
-          <div className="card">
-            <div className="flex gap-4 mb-4 border-b border-gray-100 -mx-6 px-6">
-              {(['detail', 'audit'] as const).map(t => (
-                <button
-                  key={t}
-                  onClick={() => setTab(t)}
-                  className={`pb-3 text-sm font-medium capitalize border-b-2 -mb-px transition-colors ${
-                    tab === t ? 'border-sigvaris-blue text-sigvaris-blue' : 'border-transparent text-gray-400 hover:text-gray-600'
-                  }`}
-                >
-                  {t === 'detail' ? 'Approval Flow' : 'Audit Log'}
-                </button>
-              ))}
-            </div>
-
-            {tab === 'detail' ? (
-              invoice.approval_steps.length > 0
-                ? <ApprovalTimeline steps={invoice.approval_steps} />
-                : <p className="text-gray-400 text-sm">No approval steps yet</p>
-            ) : (
-              <div className="space-y-3 text-sm">
-                {auditLog.map(e => (
-                  <div key={e.id} className="flex gap-3">
-                    <div className="w-1.5 h-1.5 rounded-full bg-sigvaris-blue mt-2 shrink-0" />
-                    <div>
-                      <p className="font-medium text-gray-900">{e.action.replace(/_/g, ' ')}</p>
-                      <p className="text-gray-400 text-xs">{e.user} · {format(new Date(e.created_at), 'dd MMM yyyy HH:mm')}</p>
-                      {e.details && Object.keys(e.details).length > 0 && (
-                        <pre className="text-xs bg-gray-50 rounded p-2 mt-1 text-gray-600 overflow-x-auto">
-                          {JSON.stringify(e.details, null, 2)}
-                        </pre>
-                      )}
-                    </div>
+                <div>
+                  <dt className="text-gray-400">Uploaded by</dt>
+                  <dd className="font-medium">{invoice.uploaded_by.display_name}</dd>
+                </div>
+                <div>
+                  <dt className="text-gray-400">Upload date</dt>
+                  <dd className="font-medium">{format(new Date(invoice.created_at), 'dd MMM yyyy')}</dd>
+                </div>
+                <div>
+                  <dt className="text-gray-400">Amount</dt>
+                  <dd className="font-medium">
+                    {invoice.amount
+                      ? Number(invoice.amount).toLocaleString('de-CH', { style: 'currency', currency: 'CHF' })
+                      : <span className="text-gray-300 font-normal">Not set</span>}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-gray-400">Invoice Date</dt>
+                  <dd className="font-medium">
+                    {invoice.due_date ? format(new Date(invoice.due_date), 'dd MMM yyyy') : <span className="text-gray-300 font-normal">Not set</span>}
+                  </dd>
+                </div>
+                {invoice.notes && (
+                  <div className="col-span-2">
+                    <dt className="text-gray-400">Notes</dt>
+                    <dd className="font-medium">{invoice.notes}</dd>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Right: actions */}
-        <div className="space-y-4">
-          {canApprove && (
-            <div className="card border-2 border-yellow-200">
-              <h3 className="font-semibold text-gray-900 mb-1">Your Approval Required</h3>
-              <p className="text-gray-400 text-xs mb-4">Step {myPendingStep!.step_order} of {invoice.approval_steps.length}</p>
-              <div className="space-y-2">
-                <button
-                  onClick={() => approveMut.mutate()}
-                  disabled={approveMut.isPending}
-                  className="btn-primary w-full justify-center"
-                >
-                  ✓ Approve
-                </button>
-                <button
-                  onClick={() => setShowReject(true)}
-                  className="btn-danger w-full justify-center"
-                >
-                  ✗ Reject
-                </button>
-              </div>
-
-              {showReject && (
-                <div className="mt-3 pt-3 border-t border-gray-100">
-                  <label className="label text-xs">Rejection reason</label>
-                  <textarea
-                    className="input text-sm"
-                    rows={2}
-                    value={rejectComment}
-                    onChange={e => setRejectComment(e.target.value)}
-                    placeholder="Optional comment…"
-                  />
+                )}
+              </dl>
+              {invoice.pdf_path && (
+                <div className="mt-4 pt-4 border-t border-gray-100">
                   <button
-                    onClick={() => rejectMut.mutate()}
-                    disabled={rejectMut.isPending}
-                    className="btn-danger w-full justify-center mt-2"
+                    onClick={() => setShowPdf(p => !p)}
+                    className="btn-secondary text-xs"
                   >
-                    Confirm Rejection
+                    📄 {showPdf ? 'Hide PDF' : 'View PDF'} — {invoice.original_filename}
                   </button>
                 </div>
               )}
             </div>
-          )}
 
-          <div className="card">
-            <h3 className="font-semibold text-gray-900 mb-3">Approval Steps</h3>
-            <ApprovalTimeline steps={invoice.approval_steps} />
-            {invoice.approval_steps.length === 0 && (
-              <p className="text-gray-400 text-xs">Assigned after owner sets approvers</p>
+            {/* Allocations */}
+            {invoice.allocations.length > 0 && (
+              <div className="card">
+                <h2 className="font-semibold text-gray-900 mb-4">Budget Allocations</h2>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-gray-400 text-xs border-b border-gray-100">
+                      <th className="pb-2 font-medium">Line / Project</th>
+                      <th className="pb-2 font-medium text-right">Amount</th>
+                      <th className="pb-2 font-medium">Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {invoice.allocations.map(a => (
+                      <tr key={a.id}>
+                        <td className="py-2">
+                          {a.budget_line
+                            ? <><span className="font-mono text-xs text-gray-400">{a.budget_line.code}</span> {a.budget_line.name}</>
+                            : <span className="text-purple-700">📁 {a.project?.name}</span>}
+                        </td>
+                        <td className="py-2 text-right font-medium">{Number(a.amount).toLocaleString('de-CH', { style: 'currency', currency: 'CHF' })}</td>
+                        <td className="py-2 text-gray-400">{a.notes || '–'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
+
+            {/* Assignment form */}
+            {canAssign && (
+              <div className="card">
+                <h2 className="font-semibold text-gray-900 mb-4">Process Invoice</h2>
+                <AssignmentForm invoiceId={invoice.id} costCenterId={invoice.cost_center_id} onDone={() => {}} />
+              </div>
+            )}
+
+            {/* Approval flow / Audit log */}
+            <div className="card">
+              <div className="flex gap-4 mb-4 border-b border-gray-100 -mx-6 px-6">
+                {(['detail', 'audit'] as const).map(t => (
+                  <button key={t} onClick={() => setTab(t)}
+                    className={`pb-3 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                      tab === t ? 'border-sigvaris-blue text-sigvaris-blue' : 'border-transparent text-gray-400 hover:text-gray-600'
+                    }`}>
+                    {t === 'detail' ? 'Approval Flow' : 'Audit Log'}
+                  </button>
+                ))}
+              </div>
+              {tab === 'detail' ? (
+                invoice.approval_steps.length > 0
+                  ? <ApprovalTimeline steps={invoice.approval_steps} />
+                  : <p className="text-gray-400 text-sm">No approval steps yet</p>
+              ) : (
+                <div className="space-y-3 text-sm">
+                  {auditLog.map(e => (
+                    <div key={e.id} className="flex gap-3">
+                      <div className="w-1.5 h-1.5 rounded-full bg-sigvaris-blue mt-2 shrink-0" />
+                      <div>
+                        <p className="font-medium text-gray-900">{e.action.replace(/_/g, ' ')}</p>
+                        <p className="text-gray-400 text-xs">{e.user} · {format(new Date(e.created_at), 'dd MMM yyyy HH:mm')}</p>
+                        {e.details && Object.keys(e.details).length > 0 && (
+                          <pre className="text-xs bg-gray-50 rounded p-2 mt-1 text-gray-600 overflow-x-auto">{JSON.stringify(e.details, null, 2)}</pre>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right — actions */}
+          <div className="space-y-4">
+            {canApprove && (
+              <div className="card border-2 border-yellow-200">
+                <h3 className="font-semibold text-gray-900 mb-1">Your Approval Required</h3>
+                <p className="text-gray-400 text-xs mb-4">Step {myPendingStep!.step_order} of {invoice.approval_steps.length}</p>
+                <div className="space-y-2">
+                  <button onClick={() => approveMut.mutate()} disabled={approveMut.isPending} className="btn-primary w-full justify-center">✓ Approve</button>
+                  <button onClick={() => setShowReject(true)} className="btn-danger w-full justify-center">✗ Reject</button>
+                </div>
+                {showReject && (
+                  <div className="mt-3 pt-3 border-t border-gray-100">
+                    <label className="label text-xs">Rejection reason</label>
+                    <textarea className="input text-sm" rows={2} value={rejectComment}
+                      onChange={e => setRejectComment(e.target.value)} placeholder="Optional comment…" />
+                    <button onClick={() => rejectMut.mutate()} disabled={rejectMut.isPending} className="btn-danger w-full justify-center mt-2">
+                      Confirm Rejection
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="card">
+              <h3 className="font-semibold text-gray-900 mb-3">Approval Steps</h3>
+              <ApprovalTimeline steps={invoice.approval_steps} />
+              {invoice.approval_steps.length === 0 && <p className="text-gray-400 text-xs">Set when owner processes the invoice</p>}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   )
 }
