@@ -29,6 +29,17 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
 
   const token = header.slice(7)
 
+  // Dev auth bypass — validate a locally-signed JWT when DEV_AUTH=true
+  if (process.env.DEV_AUTH === 'true') {
+    try {
+      const devPayload = jwt.verify(token, process.env.SECRET_KEY ?? 'dev-secret') as jwt.JwtPayload
+      if (devPayload.dev) {
+        const user = await queryOne<DbUser>('SELECT * FROM users WHERE id = $1', [devPayload.sub])
+        if (user?.is_active) { req.user = user; next(); return }
+      }
+    } catch { /* not a dev token — fall through to Azure AD */ }
+  }
+
   let payload: jwt.JwtPayload
   try {
     const decoded = jwt.decode(token, { complete: true })
