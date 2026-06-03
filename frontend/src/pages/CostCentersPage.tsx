@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   listCostCenters, createCostCenter, addMember, removeMember, searchUsers,
@@ -29,7 +29,7 @@ function MemberRow({ member, ccId, isAdmin }: {
         </div>
       </div>
       <div className="flex items-center gap-2">
-        <span className="text-xs text-gray-400 capitalize">{member.role}</span>
+        <span className="text-xs text-gray-400">CC Owner</span>
         {isAdmin && (
           <button
             onClick={() => removeMut.mutate()}
@@ -72,7 +72,7 @@ function AddMemberForm({ ccId }: { ccId: string }) {
       <input
         type="text"
         className="input text-sm"
-        placeholder="Search by name or email…"
+        placeholder="Search by name or emailâ€¦"
         value={q}
         onChange={e => setQ(e.target.value)}
       />
@@ -86,18 +86,11 @@ function AddMemberForm({ ccId }: { ccId: string }) {
               </div>
               <div className="flex gap-1 shrink-0">
                 <button
-                  onMouseDown={() => handleAdd(u.id, 'owner')}
+                  onMouseDown={() => handleAdd(u.id, 'cc_owner')}
                   disabled={adding === u.id}
                   className="px-2 py-1 rounded bg-sigvaris-blue text-white text-xs hover:bg-sigvaris-blue-light disabled:opacity-50"
                 >
-                  + Owner
-                </button>
-                <button
-                  onMouseDown={() => handleAdd(u.id, 'viewer')}
-                  disabled={adding === u.id}
-                  className="px-2 py-1 rounded bg-gray-100 text-gray-700 text-xs hover:bg-gray-200 disabled:opacity-50"
-                >
-                  + Viewer
+                  + CC Owner
                 </button>
               </div>
             </li>
@@ -110,7 +103,7 @@ function AddMemberForm({ ccId }: { ccId: string }) {
 
 function CostCenterCard({ cc }: { cc: CostCenter }) {
   const { user } = useAuth()
-  const isAdmin = user?.role === 'admin'
+  const isAdmin = user?.role === 'super_admin'
   const [expanded, setExpanded] = useState(false)
 
   return (
@@ -130,7 +123,7 @@ function CostCenterCard({ cc }: { cc: CostCenter }) {
           onClick={() => setExpanded(e => !e)}
           className="text-gray-400 hover:text-gray-600 text-xs"
         >
-          {expanded ? '▲ Hide' : '▼ Members'}
+          {expanded ? 'â–² Hide' : 'â–¼ Members'}
         </button>
       </div>
 
@@ -154,7 +147,7 @@ function CostCenterCard({ cc }: { cc: CostCenter }) {
 export default function CostCentersPage() {
   const { user } = useAuth()
   const qc = useQueryClient()
-  const isAdmin = user?.role === 'admin'
+  const isAdmin = user?.role === 'super_admin'
   const [showCreate, setShowCreate] = useState(false)
   const [newCode, setNewCode] = useState('')
   const [newName, setNewName] = useState('')
@@ -211,10 +204,10 @@ export default function CostCentersPage() {
       )}
 
       {isLoading ? (
-        <p className="text-gray-400">Loading…</p>
+        <p className="text-gray-400">Loadingâ€¦</p>
       ) : costCenters.length === 0 ? (
         <div className="card text-center py-12 text-gray-400">
-          No cost centers yet{isAdmin ? ' — create one above' : ''}
+          No cost centers yet{isAdmin ? ' â€” create one above' : ''}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
