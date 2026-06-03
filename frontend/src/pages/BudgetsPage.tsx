@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import {
@@ -87,7 +87,7 @@ export default function BudgetsPage() {
         <div>
           <label className="label">Cost Center</label>
           <select className="input" value={activeCc} onChange={e => setSelectedCc(e.target.value)}>
-            {costCenters.map(c => <option key={c.id} value={c.id}>{c.code} â€“ {c.name}</option>)}
+            {costCenters.map(c => <option key={c.id} value={c.id}>{c.code} – {c.name}</option>)}
           </select>
         </div>
         <div>
@@ -244,7 +244,7 @@ export default function BudgetsPage() {
                 {uploadError && <p className="text-red-600 text-xs">{uploadError}</p>}
                 <button onClick={() => uploadMut.mutate()} disabled={!file || !activeCc || uploadMut.isPending}
                   className="btn-primary w-full justify-center text-sm">
-                  {uploadMut.isPending ? 'Uploadingâ€¦' : 'Upload Budget'}
+                  {uploadMut.isPending ? 'Uploading…' : 'Upload Budget'}
                 </button>
               </div>
               <p className="text-xs text-gray-400 mt-3 pt-3 border-t border-gray-100">
@@ -261,9 +261,9 @@ export default function BudgetsPage() {
                   <div key={u.id} className="flex items-start gap-2 text-xs">
                     <div className={`w-2 h-2 rounded-full mt-1 shrink-0 ${u.is_active ? 'bg-green-400' : 'bg-gray-300'}`} />
                     <div>
-                      <p className="font-medium text-gray-900">{u.fiscal_year} â€” {u.original_filename}</p>
-                      <p className="text-gray-400">{u.uploaded_by.display_name} Â· {format(new Date(u.created_at), 'dd MMM yyyy')}</p>
-                      <p className="text-gray-400">{u.budget_lines.length} lines Â· {u.is_active ? 'Active' : 'Superseded'}</p>
+                      <p className="font-medium text-gray-900">{u.fiscal_year} — {u.original_filename}</p>
+                      <p className="text-gray-400">{u.uploaded_by.display_name} · {format(new Date(u.created_at), 'dd MMM yyyy')}</p>
+                      <p className="text-gray-400">{u.budget_lines.length} lines · {u.is_active ? 'Active' : 'Superseded'}</p>
                     </div>
                   </div>
                 ))}
