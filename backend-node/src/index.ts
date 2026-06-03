@@ -12,6 +12,7 @@ import budgetsRouter from './routes/budgets.ts'
 import invoicesRouter from './routes/invoices.ts'
 import accountsRouter from './routes/accounts.ts'
 import itrCodesRouter from './routes/itrCodes.ts'
+import reportsRouter from './routes/reports.ts'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -33,6 +34,7 @@ app.use('/api', budgetsRouter)
 app.use('/api', invoicesRouter)
 app.use('/api', accountsRouter)
 app.use('/api', itrCodesRouter)
+app.use('/api', reportsRouter)
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }))
 
 // Serve built frontend if dist exists
