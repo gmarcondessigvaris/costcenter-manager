@@ -1,14 +1,22 @@
-﻿import { Router } from 'express'
+import { Router } from 'express'
 import { authMiddleware, requireRole } from '../middleware/auth.ts'
 import { query, queryOne } from '../db.ts'
 import type { AuthRequest, DbUser } from '../types.ts'
 
 const router = Router()
-
 const SAFE_COLS = 'id, email, display_name, role, is_active'
 
-router.get('/users', authMiddleware, requireRole('super_admin'), async (_req, res) => {
-  const rows = await query<DbUser>(`SELECT ${SAFE_COLS} FROM users WHERE is_active = true ORDER BY display_name`)
+router.get('/users', authMiddleware, requireRole('super_admin', 'admin'), async (_req, res) => {
+  // Include cost_center count per user so the admin page can show assignment status
+  const rows = await query<DbUser & { cc_count: string }>(
+    `SELECT u.id, u.email, u.display_name, u.role, u.is_active,
+            COUNT(ccm.id)::text AS cc_count
+     FROM users u
+     LEFT JOIN cost_center_members ccm ON ccm.user_id = u.id
+     WHERE u.is_active = true
+     GROUP BY u.id
+     ORDER BY u.display_name`
+  )
   res.json(rows)
 })
 
@@ -23,34 +31,55 @@ router.get('/users/search', authMiddleware, async (req, res) => {
   res.json(rows)
 })
 
-router.post('/users', authMiddleware, requireRole('super_admin'), async (req, res) => {
-  const { email, display_name, role = 'user' } = req.body as { email: string; display_name: string; role?: string }
-  if (!email?.trim() || !display_name?.trim()) {
-    res.status(400).json({ detail: 'email and display_name required' }); return
-  }
-  const existing = await queryOne<DbUser>('SELECT id FROM users WHERE email = $1', [email.trim()])
-  if (existing) { res.status(409).json({ detail: 'A user with this email already exists' }); return }
-
-  const rows = await query<DbUser>(
-    `INSERT INTO users (azure_id, email, display_name, role)
-     VALUES ($1, $2, $3, $4) RETURNING ${SAFE_COLS}`,
-    [`dev:${email.trim()}`, email.trim(), display_name.trim(), role]
-  )
-  res.status(201).json(rows[0])
-})
-
-router.put('/users/:id/role', authMiddleware, requireRole('super_admin'), async (req, res) => {
+router.put('/users/:id/role', authMiddleware, requireRole('super_admin', 'admin'), async (req, res) => {
+  const actor = (req as AuthRequest).user
   const { role } = req.body as { role: string }
-  const validRoles = ['super_admin', 'admin', 'user']
-  if (!validRoles.includes(role)) {
-    res.status(400).json({ detail: 'Invalid role' })
-    return
+  const validRoles = ['user', 'admin', 'super_admin']
+  if (!validRoles.includes(role)) { res.status(400).json({ detail: 'Invalid role' }); return }
+
+  const target = await queryOne<DbUser>(`SELECT ${SAFE_COLS} FROM users WHERE id = $1`, [req.params.id])
+  if (!target) { res.status(404).json({ detail: 'User not found' }); return }
+
+  // Admins cannot manage other admin/super_admin accounts
+  if (actor.role === 'admin') {
+    if (target.role === 'admin' || target.role === 'super_admin') {
+      res.status(403).json({ detail: 'Admins cannot manage other admin accounts' }); return
+    }
+    if (role === 'admin' || role === 'super_admin') {
+      res.status(403).json({ detail: 'Admins cannot assign admin roles' }); return
+    }
   }
+
   const user = await queryOne<DbUser>(
     `UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2 RETURNING ${SAFE_COLS}`,
     [role, req.params.id]
   )
-  if (!user) { res.status(404).json({ detail: 'User not found' }); return }
+  res.json(user)
+})
+
+router.patch('/users/:id/deactivate', authMiddleware, requireRole('super_admin', 'admin'), async (req, res) => {
+  const actor = (req as AuthRequest).user
+  const target = await queryOne<DbUser>(`SELECT ${SAFE_COLS} FROM users WHERE id = $1`, [req.params.id])
+  if (!target) { res.status(404).json({ detail: 'User not found' }); return }
+  if (target.id === actor.id) { res.status(400).json({ detail: 'You cannot deactivate your own account' }); return }
+
+  // Admin cannot deactivate other admin/super_admin
+  if (actor.role === 'admin' && (target.role === 'admin' || target.role === 'super_admin')) {
+    res.status(403).json({ detail: 'Admins cannot deactivate other admin accounts' }); return
+  }
+
+  // Block if assigned to any cost center
+  const memberships = await query('SELECT id FROM cost_center_members WHERE user_id = $1', [target.id])
+  if (memberships.length > 0) {
+    res.status(409).json({
+      detail: `${target.display_name} is still assigned to ${memberships.length} cost center(s). Remove them first.`
+    }); return
+  }
+
+  const user = await queryOne<DbUser>(
+    `UPDATE users SET is_active = false, updated_at = NOW() WHERE id = $1 RETURNING ${SAFE_COLS}`,
+    [target.id]
+  )
   res.json(user)
 })
 
