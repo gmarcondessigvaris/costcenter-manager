@@ -21,7 +21,8 @@ export const getMe = () => api.get<User>('/auth/me').then(r => r.data)
 export const searchUsers = (q: string) =>
   api.get<User[]>('/users/search', { params: { q } }).then(r => r.data)
 
-export const listUsers = () => api.get<User[]>('/users').then(r => r.data)
+export const listUsers = () => api.get<Array<User & { cc_count: string }>>('/users').then(r => r.data)
+export const deactivateUser = (id: string) => api.patch<User>(`/users/${id}/deactivate`).then(r => r.data)
 
 export const createUser = (data: { display_name: string; email: string; role: string }) =>
   api.post<User>('/users', data).then(r => r.data)
