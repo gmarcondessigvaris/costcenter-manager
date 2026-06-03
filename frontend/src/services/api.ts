@@ -23,6 +23,9 @@ export const searchUsers = (q: string) =>
 
 export const listUsers = () => api.get<User[]>('/users').then(r => r.data)
 
+export const createUser = (data: { display_name: string; email: string; role: string }) =>
+  api.post<User>('/users', data).then(r => r.data)
+
 export const updateUserRole = (userId: string, role: string) =>
   api.put<User>(`/users/${userId}/role`, { role }).then(r => r.data)
 
