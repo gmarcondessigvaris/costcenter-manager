@@ -7,7 +7,7 @@ const router = Router()
 
 const SAFE_COLS = 'id, email, display_name, role, is_active'
 
-router.get('/users', authMiddleware, requireRole('admin'), async (_req, res) => {
+router.get('/users', authMiddleware, requireRole('super_admin'), async (_req, res) => {
   const rows = await query<DbUser>(`SELECT ${SAFE_COLS} FROM users WHERE is_active = true ORDER BY display_name`)
   res.json(rows)
 })
@@ -23,7 +23,7 @@ router.get('/users/search', authMiddleware, async (req, res) => {
   res.json(rows)
 })
 
-router.post('/users', authMiddleware, requireRole('admin'), async (req, res) => {
+router.post('/users', authMiddleware, requireRole('super_admin'), async (req, res) => {
   const { email, display_name, role = 'user' } = req.body as { email: string; display_name: string; role?: string }
   if (!email?.trim() || !display_name?.trim()) {
     res.status(400).json({ detail: 'email and display_name required' }); return
@@ -39,9 +39,9 @@ router.post('/users', authMiddleware, requireRole('admin'), async (req, res) => 
   res.status(201).json(rows[0])
 })
 
-router.put('/users/:id/role', authMiddleware, requireRole('admin'), async (req, res) => {
+router.put('/users/:id/role', authMiddleware, requireRole('super_admin'), async (req, res) => {
   const { role } = req.body as { role: string }
-  const validRoles = ['admin', 'finance', 'user']
+  const validRoles = ['super_admin', 'admin', 'user']
   if (!validRoles.includes(role)) {
     res.status(400).json({ detail: 'Invalid role' })
     return
