@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { listVendors, createVendor, updateVendor, archiveVendor, restoreVendor } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
@@ -42,7 +42,7 @@ function VendorForm({
           disabled={!name.trim() || isPending}
           className="btn-primary"
         >
-          {isPending ? 'Saving…' : initial ? 'Save Changes' : 'Create Vendor'}
+          {isPending ? 'Savingâ€¦' : initial ? 'Save Changes' : 'Create Vendor'}
         </button>
         <button onClick={onCancel} className="btn-secondary">Cancel</button>
       </div>
@@ -133,7 +133,7 @@ export default function VendorsPage() {
   const [search, setSearch] = useState('')
   const [createError, setCreateError] = useState('')
 
-  if (user?.role !== 'admin' && user?.role !== 'finance') {
+  if (user?.role !== 'super_admin' && user?.role !== 'admin') {
     return <Navigate to="/dashboard" replace />
   }
 
@@ -186,7 +186,7 @@ export default function VendorsPage() {
       <div className="flex gap-3 mb-4">
         <input
           className="input max-w-sm"
-          placeholder="Search vendors…"
+          placeholder="Search vendorsâ€¦"
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
@@ -202,12 +202,12 @@ export default function VendorsPage() {
       </div>
 
       {isLoading ? (
-        <p className="text-gray-400">Loading…</p>
+        <p className="text-gray-400">Loadingâ€¦</p>
       ) : (
         <div className="space-y-3">
           {active.length === 0 && !showArchived && (
             <div className="card text-center py-12 text-gray-400">
-              No vendors yet — create one above.
+              No vendors yet â€” create one above.
             </div>
           )}
 
