@@ -45,8 +45,17 @@ function InvoiceSubRows({ invoices }: { invoices: any[] }) {
               <span className="text-gray-400 ml-2">due {format(new Date(inv.due_date), 'dd MMM yyyy')}</span>
             )}
           </td>
-          <td className="px-4 py-2 text-right text-xs text-gray-400">{CHF(inv.invoice_amount)}</td>
-          <td className="px-4 py-2 text-right text-xs font-medium text-gray-700">{CHF(inv.allocated_amount)}</td>
+          <td className="px-4 py-2 text-right text-xs text-gray-400">
+            {inv.currency && inv.currency !== 'CHF'
+              ? <span title={`${inv.currency} ${inv.invoice_amount?.toLocaleString()}`}>{CHF(inv.invoice_amount_chf ?? inv.invoice_amount)}</span>
+              : CHF(inv.invoice_amount)}
+            {inv.currency && inv.currency !== 'CHF' && (
+              <span className="block text-gray-300">{inv.currency} {Number(inv.invoice_amount).toLocaleString()}</span>
+            )}
+          </td>
+          <td className="px-4 py-2 text-right text-xs font-medium text-gray-700">
+            {CHF(inv.allocated_amount_chf ?? inv.allocated_amount)}
+          </td>
           <td className="px-4 py-2" />
           <td className="px-4 py-2 text-center"><StatusBadge status={inv.status} /></td>
         </tr>
