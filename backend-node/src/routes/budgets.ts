@@ -25,20 +25,64 @@ const upload = multer({ storage, fileFilter: (_req, file, cb) => {
 
 // â”€â”€ Vendors â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-router.get('/vendors', authMiddleware, async (_req, res) => {
-  const rows = await query('SELECT id, name FROM vendors WHERE is_active = true ORDER BY name')
+router.get('/vendors', authMiddleware, async (req, res) => {
+  const includeArchived = req.query.include_archived === 'true'
+  const rows = await query(
+    `SELECT id, name, description, address, is_active FROM vendors
+     ${includeArchived ? '' : 'WHERE is_active = true'}
+     ORDER BY name`
+  )
   res.json(rows)
 })
 
 router.post('/vendors', authMiddleware, requireRole('finance', 'admin'), async (req, res) => {
-  const { name } = req.body as { name: string }
+  const { name, description, address } = req.body as { name: string; description?: string; address?: string }
   if (!name?.trim()) { res.status(400).json({ detail: 'name required' }); return }
+  const existing = await queryOne('SELECT id FROM vendors WHERE name ILIKE $1', [name.trim()])
+  if (existing) { res.status(409).json({ detail: 'A vendor with this name already exists' }); return }
   const rows = await query(
-    `INSERT INTO vendors (name) VALUES ($1)
-     ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name RETURNING id, name`,
-    [name.trim()]
+    `INSERT INTO vendors (name, description, address) VALUES ($1, $2, $3)
+     RETURNING id, name, description, address, is_active`,
+    [name.trim(), description?.trim() ?? null, address?.trim() ?? null]
   )
   res.status(201).json(rows[0])
+})
+
+router.put('/vendors/:id', authMiddleware, requireRole('finance', 'admin'), async (req, res) => {
+  const { name, description, address } = req.body as { name?: string; description?: string; address?: string }
+  const sets: string[] = ['updated_at = NOW()']
+  const vals: unknown[] = []
+  if (name        !== undefined) { vals.push(name?.trim());        sets.push(`name = $${vals.length}`) }
+  if (description !== undefined) { vals.push(description?.trim()); sets.push(`description = $${vals.length}`) }
+  if (address     !== undefined) { vals.push(address?.trim());     sets.push(`address = $${vals.length}`) }
+  vals.push(req.params.id)
+  const rows = await query(
+    `UPDATE vendors SET ${sets.join(', ')} WHERE id = $${vals.length}
+     RETURNING id, name, description, address, is_active`,
+    vals
+  )
+  if (!rows.length) { res.status(404).json({ detail: 'Vendor not found' }); return }
+  res.json(rows[0])
+})
+
+router.patch('/vendors/:id/archive', authMiddleware, requireRole('finance', 'admin'), async (req, res) => {
+  const rows = await query(
+    `UPDATE vendors SET is_active = false, updated_at = NOW() WHERE id = $1
+     RETURNING id, name, is_active`,
+    [req.params.id]
+  )
+  if (!rows.length) { res.status(404).json({ detail: 'Vendor not found' }); return }
+  res.json(rows[0])
+})
+
+router.patch('/vendors/:id/restore', authMiddleware, requireRole('finance', 'admin'), async (req, res) => {
+  const rows = await query(
+    `UPDATE vendors SET is_active = true, updated_at = NOW() WHERE id = $1
+     RETURNING id, name, is_active`,
+    [req.params.id]
+  )
+  if (!rows.length) { res.status(404).json({ detail: 'Vendor not found' }); return }
+  res.json(rows[0])
 })
 
 // â”€â”€ Budget uploads â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
