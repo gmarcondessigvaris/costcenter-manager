@@ -74,7 +74,7 @@ function CreateUserForm({ onCreated }: { onCreated: () => void }) {
 }
 
 export default function AdminPage() {
-  const { user } = useAuth()
+  const { user, loading } = useAuth()
   const qc = useQueryClient()
 
   // All hooks must be called before any conditional return
@@ -88,6 +88,7 @@ export default function AdminPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
   })
 
+  if (loading) return <div className="p-8 text-gray-400">Loading…</div>
   if (user?.role !== 'admin') return <Navigate to="/dashboard" replace />
 
   return (
