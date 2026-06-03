@@ -46,10 +46,20 @@ export const removeMember = (ccId: string, userId: string) =>
   api.delete(`/cost-centers/${ccId}/members/${userId}`)
 
 // ── Vendors ───────────────────────────────────────────────────────────────────
-export const listVendors = () => api.get<Vendor[]>('/vendors').then(r => r.data)
+export const listVendors = (includeArchived = false) =>
+  api.get<Vendor[]>('/vendors', { params: includeArchived ? { include_archived: true } : {} }).then(r => r.data)
 
-export const createVendor = (name: string) =>
-  api.post<Vendor>('/vendors', { name }).then(r => r.data)
+export const createVendor = (data: { name: string; description?: string; address?: string }) =>
+  api.post<Vendor>('/vendors', data).then(r => r.data)
+
+export const updateVendor = (id: string, data: { name?: string; description?: string; address?: string }) =>
+  api.put<Vendor>(`/vendors/${id}`, data).then(r => r.data)
+
+export const archiveVendor = (id: string) =>
+  api.patch<Vendor>(`/vendors/${id}/archive`).then(r => r.data)
+
+export const restoreVendor = (id: string) =>
+  api.patch<Vendor>(`/vendors/${id}/restore`).then(r => r.data)
 
 // ── Budgets ───────────────────────────────────────────────────────────────────
 export const listBudgetUploads = (ccId: string) =>
