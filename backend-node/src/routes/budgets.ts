@@ -35,7 +35,7 @@ router.get('/vendors', authMiddleware, async (req, res) => {
   res.json(rows)
 })
 
-router.post('/vendors', authMiddleware, requireRole('finance', 'admin'), async (req, res) => {
+router.post('/vendors', authMiddleware, requireRole('admin', 'super_admin'), async (req, res) => {
   const { name, description, address } = req.body as { name: string; description?: string; address?: string }
   if (!name?.trim()) { res.status(400).json({ detail: 'name required' }); return }
   const existing = await queryOne('SELECT id FROM vendors WHERE name ILIKE $1', [name.trim()])
@@ -48,7 +48,7 @@ router.post('/vendors', authMiddleware, requireRole('finance', 'admin'), async (
   res.status(201).json(rows[0])
 })
 
-router.put('/vendors/:id', authMiddleware, requireRole('finance', 'admin'), async (req, res) => {
+router.put('/vendors/:id', authMiddleware, requireRole('admin', 'super_admin'), async (req, res) => {
   const { name, description, address } = req.body as { name?: string; description?: string; address?: string }
   const sets: string[] = ['updated_at = NOW()']
   const vals: unknown[] = []
@@ -65,7 +65,7 @@ router.put('/vendors/:id', authMiddleware, requireRole('finance', 'admin'), asyn
   res.json(rows[0])
 })
 
-router.patch('/vendors/:id/archive', authMiddleware, requireRole('finance', 'admin'), async (req, res) => {
+router.patch('/vendors/:id/archive', authMiddleware, requireRole('admin', 'super_admin'), async (req, res) => {
   const rows = await query(
     `UPDATE vendors SET is_active = false, updated_at = NOW() WHERE id = $1
      RETURNING id, name, is_active`,
@@ -75,7 +75,7 @@ router.patch('/vendors/:id/archive', authMiddleware, requireRole('finance', 'adm
   res.json(rows[0])
 })
 
-router.patch('/vendors/:id/restore', authMiddleware, requireRole('finance', 'admin'), async (req, res) => {
+router.patch('/vendors/:id/restore', authMiddleware, requireRole('admin', 'super_admin'), async (req, res) => {
   const rows = await query(
     `UPDATE vendors SET is_active = true, updated_at = NOW() WHERE id = $1
      RETURNING id, name, is_active`,
@@ -87,7 +87,7 @@ router.patch('/vendors/:id/restore', authMiddleware, requireRole('finance', 'adm
 
 // â”€â”€ Budget uploads â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-router.post('/cost-centers/:id/budgets', authMiddleware, requireRole('finance', 'admin'),
+router.post('/cost-centers/:id/budgets', authMiddleware, requireRole('admin', 'super_admin'),
   upload.single('file'), async (req, res) => {
     const ccId = req.params.id
     const actor = (req as AuthRequest).user
