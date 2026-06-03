@@ -35,7 +35,7 @@ router.get('/cost-centers', authMiddleware, async (req, res) => {
   const user = (req as AuthRequest).user
   let rows: Array<Record<string, unknown>>
 
-  if (user.role === 'admin' || user.role === 'finance') {
+  if (user.role === 'super_admin' || user.role === 'admin') {
     rows = await query('SELECT id FROM cost_centers WHERE is_active = true ORDER BY code')
   } else {
     rows = await query(
@@ -50,7 +50,7 @@ router.get('/cost-centers', authMiddleware, async (req, res) => {
   res.json(costCenters.filter(Boolean))
 })
 
-router.post('/cost-centers', authMiddleware, requireRole('admin'), async (req, res) => {
+router.post('/cost-centers', authMiddleware, requireRole('super_admin'), async (req, res) => {
   const { code, name } = req.body as { code: string; name: string }
   if (!code || !name) { res.status(400).json({ detail: 'code and name required' }); return }
 
@@ -66,7 +66,7 @@ router.post('/cost-centers', authMiddleware, requireRole('admin'), async (req, r
   res.status(201).json(await getCostCenter(rows[0].id as string))
 })
 
-router.put('/cost-centers/:id', authMiddleware, requireRole('admin'), async (req, res) => {
+router.put('/cost-centers/:id', authMiddleware, requireRole('super_admin'), async (req, res) => {
   const { name, is_active } = req.body as { name?: string; is_active?: boolean }
   const sets: string[] = ['updated_at = NOW()']
   const vals: unknown[] = []
@@ -79,7 +79,7 @@ router.put('/cost-centers/:id', authMiddleware, requireRole('admin'), async (req
   res.json(cc)
 })
 
-router.post('/cost-centers/:id/members', authMiddleware, requireRole('admin'), async (req, res) => {
+router.post('/cost-centers/:id/members', authMiddleware, requireRole('super_admin'), async (req, res) => {
   const { user_id, role = 'owner' } = req.body as { user_id: string; role?: string }
   const ccId = req.params.id
   const actor = (req as AuthRequest).user
@@ -99,7 +99,7 @@ router.post('/cost-centers/:id/members', authMiddleware, requireRole('admin'), a
   res.status(201).json(await getCostCenter(ccId))
 })
 
-router.delete('/cost-centers/:id/members/:userId', authMiddleware, requireRole('admin'), async (req, res) => {
+router.delete('/cost-centers/:id/members/:userId', authMiddleware, requireRole('super_admin'), async (req, res) => {
   const { id: ccId, userId } = req.params
   const actor = (req as AuthRequest).user
   const result = await query(
