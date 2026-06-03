@@ -187,8 +187,10 @@ router.put('/invoices/:id/assign', authMiddleware, async (req, res) => {
     res.status(409).json({ detail: `Invoice is already in status '${inv.status}'` }); return
   }
 
-  const { amount, due_date, notes, allocations, approver_1_id, approver_2_id } = req.body as {
+  const { amount, due_date, notes, allocations, approver_1_id, approver_2_id,
+          currency = 'CHF', exchange_rate_mode = 'auto', exchange_rate: manualRate } = req.body as {
     amount: number; due_date: string; notes?: string
+    currency?: string; exchange_rate_mode?: string; exchange_rate?: number
     allocations: Array<{ budget_line_id?: string; project_id?: string; amount: number; notes?: string }>
     approver_1_id: string; approver_2_id: string
   }
@@ -200,9 +202,25 @@ router.put('/invoices/:id/assign', authMiddleware, async (req, res) => {
   const a2 = await queryOne('SELECT id FROM users WHERE id = $1', [approver_2_id])
   if (!a1 || !a2) { res.status(400).json({ detail: 'One or both approvers not found' }); return }
 
+  // Resolve exchange rate
+  let exchangeRate = 1.0
+  if (currency === 'CHF') {
+    exchangeRate = 1.0
+  } else if (exchange_rate_mode === 'manual' && manualRate) {
+    exchangeRate = manualRate
+  } else {
+    const cur = await queryOne('SELECT rate_to_chf FROM currencies WHERE code = $1 AND is_active = true', [currency])
+    exchangeRate = cur ? Number(cur.rate_to_chf) : 1.0
+  }
+
   await withTransaction(async (q) => {
-    await q('UPDATE invoices SET amount=$1, due_date=$2, notes=$3, status=$4, updated_at=NOW() WHERE id=$5',
-      [amount, due_date, notes ?? null, 'pending_approval', inv.id])
+    await q(
+      `UPDATE invoices SET amount=$1, due_date=$2, notes=$3, status=$4,
+         currency=$5, exchange_rate=$6, exchange_rate_mode=$7, updated_at=NOW()
+       WHERE id=$8`,
+      [amount, due_date, notes ?? null, 'pending_approval',
+       currency, exchangeRate, exchange_rate_mode, inv.id]
+    )
     await q('DELETE FROM invoice_allocations WHERE invoice_id = $1', [inv.id])
     for (const alloc of allocations) {
       await q(
