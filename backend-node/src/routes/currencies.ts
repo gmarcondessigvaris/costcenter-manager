@@ -1,4 +1,4 @@
-import { Router } from 'express'
+﻿import { Router } from 'express'
 import { authMiddleware, requireRole } from '../middleware/auth.ts'
 import { query, queryOne } from '../db.ts'
 import type { AuthRequest } from '../types.ts'
@@ -16,7 +16,7 @@ router.get('/currencies', authMiddleware, async (_req, res) => {
   ))
 })
 
-router.post('/currencies', authMiddleware, requireRole('admin'), async (req, res) => {
+router.post('/currencies', authMiddleware, requireRole('super_admin'), async (req, res) => {
   const actor = (req as AuthRequest).user
   const { code, name, rate_to_chf } = req.body as { code: string; name: string; rate_to_chf: number }
   if (!code?.trim() || !name?.trim() || !rate_to_chf) {
@@ -32,7 +32,7 @@ router.post('/currencies', authMiddleware, requireRole('admin'), async (req, res
   res.status(201).json(rows[0])
 })
 
-router.put('/currencies/:id', authMiddleware, requireRole('admin'), async (req, res) => {
+router.put('/currencies/:id', authMiddleware, requireRole('super_admin'), async (req, res) => {
   const actor = (req as AuthRequest).user
   const { name, rate_to_chf, is_active } = req.body as { name?: string; rate_to_chf?: number; is_active?: boolean }
   const sets: string[] = ['updated_at = NOW()', `updated_by_id = '${actor.id}'`]
