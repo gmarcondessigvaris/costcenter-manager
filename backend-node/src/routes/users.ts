@@ -23,6 +23,22 @@ router.get('/users/search', authMiddleware, async (req, res) => {
   res.json(rows)
 })
 
+router.post('/users', authMiddleware, requireRole('admin'), async (req, res) => {
+  const { email, display_name, role = 'user' } = req.body as { email: string; display_name: string; role?: string }
+  if (!email?.trim() || !display_name?.trim()) {
+    res.status(400).json({ detail: 'email and display_name required' }); return
+  }
+  const existing = await queryOne<DbUser>('SELECT id FROM users WHERE email = $1', [email.trim()])
+  if (existing) { res.status(409).json({ detail: 'A user with this email already exists' }); return }
+
+  const rows = await query<DbUser>(
+    `INSERT INTO users (azure_id, email, display_name, role)
+     VALUES ($1, $2, $3, $4) RETURNING ${SAFE_COLS}`,
+    [`dev:${email.trim()}`, email.trim(), display_name.trim(), role]
+  )
+  res.status(201).json(rows[0])
+})
+
 router.put('/users/:id/role', authMiddleware, requireRole('admin'), async (req, res) => {
   const { role } = req.body as { role: string }
   const validRoles = ['admin', 'finance', 'user']
