@@ -66,18 +66,54 @@ router.post('/cost-centers/:id/budgets', authMiddleware, requireRole('finance', 
     )
     const budgetUploadId = uploadRows[0].id as string
 
-    const lines = await parseBudgetExcel(req.file.path)
-    for (const line of lines) {
+    // Parse all sheets; use the sheet matching this cost center (or first sheet)
+    const cc2 = await queryOne('SELECT code FROM cost_centers WHERE id = $1', [ccId])
+    const sheets = await parseBudgetExcel(req.file.path)
+    const sheet = sheets.find(s => s.cost_center_code === cc2?.code) ?? sheets[0]
+
+    // Upsert accounts
+    const accountIdMap = new Map<string, string>()
+    for (const acc of sheet?.accounts ?? []) {
+      const rows = await query(
+        `INSERT INTO accounts (code, description)
+         VALUES ($1, $2)
+         ON CONFLICT (code) DO UPDATE SET description = $2, updated_at = NOW()
+         RETURNING id`,
+        [acc.code, acc.description]
+      )
+      accountIdMap.set(acc.code, rows[0].id as string)
+    }
+
+    // Upsert ITR codes
+    const itrIdMap = new Map<string, string>()
+    for (const itr of sheet?.itr_codes ?? []) {
+      const rows = await query(
+        `INSERT INTO itr_codes (code, description)
+         VALUES ($1, $2)
+         ON CONFLICT (code) DO UPDATE SET description = $2, updated_at = NOW()
+         RETURNING id`,
+        [itr.code, itr.description]
+      )
+      itrIdMap.set(itr.code, rows[0].id as string)
+    }
+
+    // Insert budget lines
+    const lineCount = (sheet?.budget_lines ?? []).length
+    for (const line of sheet?.budget_lines ?? []) {
+      const accountId = accountIdMap.get(line.account_code) ?? null
+      const itrId     = itrIdMap.get(line.itr_code) ?? null
       await query(
-        `INSERT INTO budget_lines (cost_center_id, budget_upload_id, code, name, allocated_amount)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [ccId, budgetUploadId, line.code, line.name, line.allocated_amount]
+        `INSERT INTO budget_lines
+           (cost_center_id, budget_upload_id, code, name, allocated_amount, description, account_id, itr_code_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [ccId, budgetUploadId, line.account_code, line.description, line.budget_value,
+         line.description, accountId, itrId]
       )
     }
 
     await logAction({
       entityType: 'BudgetUpload', entityId: budgetUploadId, action: 'uploaded', userId: actor.id,
-      details: { cost_center_id: ccId, fiscal_year, lines: lines.length },
+      details: { cost_center_id: ccId, fiscal_year, lines: lineCount },
     })
 
     const result = await getBudgetUpload(budgetUploadId)
@@ -116,13 +152,18 @@ router.get('/cost-centers/:id/budgets', authMiddleware, async (req, res) => {
 
 router.get('/cost-centers/:id/budget-lines', authMiddleware, async (req, res) => {
   const { fiscal_year } = req.query as { fiscal_year?: string }
-  let sql = `SELECT bl.id, bl.code, bl.name, bl.allocated_amount, bl.is_active
+  let sql = `SELECT bl.id, bl.code, bl.name, bl.allocated_amount, bl.is_active,
+                    bl.description, bl.account_id, bl.itr_code_id,
+                    a.code  AS account_code,  a.description  AS account_description,
+                    it.code AS itr_code,      it.description AS itr_description
              FROM budget_lines bl
              JOIN budget_uploads bu ON bu.id = bl.budget_upload_id
+             LEFT JOIN accounts  a  ON a.id  = bl.account_id
+             LEFT JOIN itr_codes it ON it.id = bl.itr_code_id
              WHERE bl.cost_center_id = $1 AND bl.is_active = true AND bu.is_active = true`
   const params: unknown[] = [req.params.id]
   if (fiscal_year) { params.push(fiscal_year); sql += ` AND bu.fiscal_year = $${params.length}` }
-  sql += ' ORDER BY bl.code'
+  sql += ' ORDER BY a.code NULLS LAST, bl.code'
   res.json(await query(sql, params))
 })
 
