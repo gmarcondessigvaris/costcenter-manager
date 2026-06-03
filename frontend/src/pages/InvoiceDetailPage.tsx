@@ -310,8 +310,15 @@ export default function InvoiceDetailPage() {
       <div className="flex items-center gap-4 mb-5">
         <button onClick={() => navigate(-1)} className="text-gray-400 hover:text-gray-700 text-sm">← Back</button>
         <div className="flex-1">
-          <h1 className="text-xl font-bold text-gray-900">{invoice.vendor.name}</h1>
-          {invoice.invoice_number && <p className="text-gray-400 text-sm">{invoice.invoice_number}</p>}
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-xl font-bold text-gray-900">{invoice.vendor.name}</h1>
+            {invoice.cost_center && (
+              <span className="text-xs bg-sigvaris-blue-pale text-sigvaris-blue px-2 py-0.5 rounded font-mono font-medium">
+                {invoice.cost_center.code} — {invoice.cost_center.name}
+              </span>
+            )}
+          </div>
+          {invoice.invoice_number && <p className="text-gray-400 text-sm mt-0.5">{invoice.invoice_number}</p>}
         </div>
         <span className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${statusColors[invoice.status]}`}>
           {statusLabel[invoice.status] ?? invoice.status}
