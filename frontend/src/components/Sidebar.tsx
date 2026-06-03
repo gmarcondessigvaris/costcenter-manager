@@ -26,8 +26,10 @@ export default function Sidebar() {
     <aside className="w-64 bg-sigvaris-blue flex flex-col shrink-0">
       {/* Logo */}
       <div className="px-6 py-5 border-b border-white/10">
-        <img src={logo} alt="SIGVARIS" className="h-8 brightness-0 invert" />
-        <p className="text-white/60 text-xs mt-1 font-medium tracking-wide uppercase">
+        <div className="bg-white rounded-lg px-3 py-2 inline-block">
+          <img src={logo} alt="SIGVARIS" className="h-7" />
+        </div>
+        <p className="text-white/60 text-xs mt-2 font-medium tracking-wide uppercase">
           Cost Center Manager
         </p>
       </div>
