@@ -3,6 +3,7 @@ import express from 'express'
 import cors from 'cors'
 import fs from 'fs'
 import authRouter from './routes/auth.ts'
+import devAuthRouter from './routes/devAuth.ts'
 import usersRouter from './routes/users.ts'
 import costCentersRouter from './routes/costCenters.ts'
 import budgetsRouter from './routes/budgets.ts'
@@ -18,6 +19,7 @@ app.use(cors({ origin: ['http://localhost:5173', 'http://localhost:3000'], crede
 app.use(express.json())
 
 app.use(authRouter)
+app.use(devAuthRouter)
 app.use(usersRouter)
 app.use(costCentersRouter)
 app.use(budgetsRouter)
