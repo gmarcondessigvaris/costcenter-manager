@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { format, differenceInDays } from 'date-fns'
 import {
-  getInvoice, listBudgetLines, listProjects, searchUsers,
+  getInvoice, listBudgetLines, listBudgetUploads, listProjects, searchUsers,
   assignInvoice, approveInvoice, rejectInvoice,
   getInvoiceSuggestions, getInvoiceAuditLog, getInvoicePdfBlob,
   listCurrencies,
@@ -64,12 +64,29 @@ function AssignmentForm({ invoiceId, costCenterId, onDone }: {
 }) {
   const { user: currentUser } = useAuth()
   const qc = useQueryClient()
-  const [approver1, setApprover1] = useState<User | null>(null)
-  const [approver2, setApprover2] = useState<User | null>(null)
-  const [error, setError]         = useState('')
-  const [currency, setCurrency]   = useState('CHF')
+  const [approver1, setApprover1]         = useState<User | null>(null)
+  const [approver2, setApprover2]         = useState<User | null>(null)
+  const [error, setError]                 = useState('')
+  const [currency, setCurrency]           = useState('CHF')
+  const [budgetYear, setBudgetYear]       = useState('')
 
-  const { data: budgetLines = [] } = useQuery({ queryKey: ['budget-lines', costCenterId], queryFn: () => listBudgetLines(costCenterId) })
+  // Load available budget years for this cost center
+  const { data: budgetUploads = [] } = useQuery({
+    queryKey: ['budget-uploads', costCenterId],
+    queryFn: () => listBudgetUploads(costCenterId),
+  })
+  const availableYears = [...new Set(
+    (budgetUploads as any[]).filter((u: any) => u.is_active).map((u: any) => u.fiscal_year)
+  )].sort((a, b) => b.localeCompare(a))
+
+  // Auto-select current year if available
+  const effectiveYear = budgetYear || availableYears[0] || ''
+
+  const { data: budgetLines = [] } = useQuery({
+    queryKey: ['budget-lines', costCenterId, effectiveYear],
+    queryFn: () => listBudgetLines(costCenterId, effectiveYear || undefined),
+    enabled: !!costCenterId,
+  })
   const { data: projects = [] }    = useQuery({ queryKey: ['projects', costCenterId],     queryFn: () => listProjects(costCenterId) })
   const { data: currencies = [] }  = useQuery({ queryKey: ['currencies'],                 queryFn: listCurrencies })
   const { data: suggestions = [] } = useQuery({ queryKey: ['suggestions', invoiceId],    queryFn: () => getInvoiceSuggestions(invoiceId) })
@@ -164,6 +181,24 @@ function AssignmentForm({ invoiceId, costCenterId, onDone }: {
       <div>
         <label className="label">Notes</label>
         <textarea className="input" rows={2} {...register('notes')} />
+      </div>
+
+      {/* Budget year selector */}
+      <div>
+        <label className="label">Budget Year *</label>
+        {availableYears.length > 0 ? (
+          <select className="input" value={effectiveYear}
+            onChange={e => setBudgetYear(e.target.value)}>
+            {availableYears.map(y => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+        ) : (
+          <div className="input bg-gray-50 text-gray-400 text-sm">
+            No budget uploaded for this cost center yet
+          </div>
+        )}
+        <p className="text-xs text-gray-400 mt-1">Budget lines below are filtered to the selected year.</p>
       </div>
 
       <div>
