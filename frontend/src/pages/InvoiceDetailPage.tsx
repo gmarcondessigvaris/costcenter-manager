@@ -119,8 +119,6 @@ function AssignmentForm({ invoiceId, costCenterId, onDone }: {
   const [approver2, setApprover2] = useState<User | null>(null)
   const [error, setError] = useState('')
   const [currency, setCurrency] = useState('CHF')
-  const [rateMode, setRateMode] = useState<'auto' | 'manual'>('auto')
-  const [manualRate, setManualRate] = useState('')
 
   const { data: budgetLines = [] } = useQuery({
     queryKey: ['budget-lines', costCenterId],
@@ -134,9 +132,7 @@ function AssignmentForm({ invoiceId, costCenterId, onDone }: {
     queryKey: ['currencies'],
     queryFn: listCurrencies,
   })
-  const activeCurrencies = currencies.filter((c: any) => c.is_active)
-  const selectedCurrency = activeCurrencies.find((c: any) => c.code === currency)
-  const displayRate = rateMode === 'manual' ? parseFloat(manualRate) || 0 : Number(selectedCurrency?.rate_to_chf ?? 1)
+  const activeCurrencies = (currencies as any[]).filter((c: any) => c.is_active)
   const { data: suggestions = [] } = useQuery({
     queryKey: ['suggestions', invoiceId],
     queryFn: () => getInvoiceSuggestions(invoiceId),
@@ -175,8 +171,6 @@ function AssignmentForm({ invoiceId, costCenterId, onDone }: {
       due_date: form.due_date,
       notes: form.notes || undefined,
       currency,
-      exchange_rate_mode: rateMode,
-      exchange_rate: rateMode === 'manual' ? parseFloat(manualRate) : undefined,
       allocations,
       approver_1_id: approver1.id,
       approver_2_id: approver2.id,
@@ -204,57 +198,26 @@ function AssignmentForm({ invoiceId, costCenterId, onDone }: {
         </div>
       )}
 
-      {/* Currency */}
-      <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-medium text-gray-700">Currency & Exchange Rate</p>
-          <div className="flex rounded-lg border border-gray-300 overflow-hidden text-xs">
-            {(['auto','manual'] as const).map(m => (
-              <button key={m} type="button" onClick={() => setRateMode(m)}
-                className={`px-3 py-1.5 font-medium transition-colors capitalize ${
-                  rateMode === m ? 'bg-sigvaris-blue text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
-                }`}>
-                {m === 'auto' ? '⚡ Auto rate' : '✏️ Manual rate'}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="grid grid-cols-3 gap-3">
-          <div>
-            <label className="label text-xs">Currency *</label>
-            <select className="input text-sm" value={currency} onChange={e => setCurrency(e.target.value)}>
-              {activeCurrencies.map((c: any) => (
-                <option key={c.code} value={c.code}>{c.code} — {c.name}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="label text-xs">
-              {rateMode === 'auto' ? 'Current rate (1 '+currency+' =)' : 'Custom rate (1 '+currency+' =)'}
-            </label>
-            {rateMode === 'auto' ? (
-              <div className="input bg-gray-100 text-gray-500 text-sm">
-                {displayRate.toFixed(6)} CHF
-              </div>
-            ) : (
-              <input type="number" step="0.000001" className="input text-sm"
-                placeholder="e.g. 1.05" value={manualRate} onChange={e => setManualRate(e.target.value)} />
-            )}
-          </div>
-          <div>
-            <label className="label text-xs">Amount in CHF (preview)</label>
-            <div className="input bg-gray-100 text-gray-500 text-sm font-mono">
-              {/* Shown once amount is entered */}
-              {displayRate > 0 ? `≈ CHF ${(displayRate).toFixed(4)} × amount` : '—'}
-            </div>
-          </div>
-        </div>
-      </div>
-
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="label">Amount ({currency}) *</label>
-          <input type="number" step="0.01" className="input" required {...register('amount')} />
+          <label className="label">Amount *</label>
+          <div className="flex gap-2">
+            <select
+              className="input w-28 shrink-0"
+              value={currency}
+              onChange={e => setCurrency(e.target.value)}
+            >
+              {activeCurrencies.map((c: any) => (
+                <option key={c.code} value={c.code}>{c.code}</option>
+              ))}
+            </select>
+            <input type="number" step="0.01" className="input flex-1" required {...register('amount')} />
+          </div>
+          {currency !== 'CHF' && (
+            <p className="text-xs text-gray-400 mt-1">
+              Will be converted to CHF automatically using the current exchange rate.
+            </p>
+          )}
         </div>
         <div>
           <label className="label">Due Date *</label>
