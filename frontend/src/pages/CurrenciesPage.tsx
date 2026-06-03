@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { listCurrencies, createCurrency, updateCurrency } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
@@ -40,7 +40,7 @@ export default function CurrenciesPage() {
     onSuccess:  () => qc.invalidateQueries({ queryKey: ['currencies'] }),
   })
 
-  if (loading) return <div className="p-8 text-gray-400">Loadingâ€¦</div>
+  if (loading) return <div className="p-8 text-gray-400">Loading…</div>
   if (user?.role !== 'super_admin') return <Navigate to="/dashboard" replace />
 
   const active   = currencies.filter((c: any) => c.is_active)
@@ -84,7 +84,7 @@ export default function CurrenciesPage() {
           {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
           <div className="flex gap-3 mt-4">
             <button onClick={() => createMut.mutate()} disabled={!newCode || !newName || !newRate || createMut.isPending} className="btn-primary">
-              {createMut.isPending ? 'Savingâ€¦' : 'Add Currency'}
+              {createMut.isPending ? 'Saving…' : 'Add Currency'}
             </button>
             <button onClick={() => setShowAdd(false)} className="btn-secondary">Cancel</button>
           </div>
@@ -96,7 +96,7 @@ export default function CurrenciesPage() {
         <div className="px-6 py-4 border-b border-gray-100">
           <h2 className="font-semibold text-gray-900">Active Currencies</h2>
         </div>
-        {isLoading ? <div className="p-8 text-center text-gray-400">Loadingâ€¦</div> : (
+        {isLoading ? <div className="p-8 text-center text-gray-400">Loading…</div> : (
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
@@ -128,7 +128,7 @@ export default function CurrenciesPage() {
                     )}
                   </td>
                   <td className="px-6 py-3 text-xs text-gray-400">
-                    {c.updated_by && <span>{c.updated_by} Â· </span>}
+                    {c.updated_by && <span>{c.updated_by} · </span>}
                     {format(new Date(c.updated_at), 'dd MMM yyyy HH:mm')}
                   </td>
                   <td className="px-6 py-3 text-right">
