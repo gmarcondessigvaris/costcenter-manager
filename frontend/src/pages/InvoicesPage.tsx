@@ -7,10 +7,10 @@ import { useAuth } from '../contexts/AuthContext'
 import type { InvoiceStatus } from '../types'
 
 const STATUS_LABELS: Record<InvoiceStatus, string> = {
-  pending_assignment: 'Needs Assignment',
-  pending_approval: 'Pending Approval',
-  approved: 'Approved',
-  rejected: 'Rejected',
+  pending_assignment: 'New',
+  pending_approval:   'Pending Approval',
+  approved:           'Approved',
+  rejected:           'Rejected',
 }
 
 function StatusBadge({ status }: { status: InvoiceStatus }) {
