@@ -10,13 +10,16 @@ const navItems = [
   { to: '/cost-centers', label: 'Cost Centers', icon: '🏢' },
 ]
 
-const adminItem = { to: '/admin', label: 'Admin', icon: '⚙️' }
+const adminItems = [
+  { to: '/vendors', label: 'Vendors', icon: '🏭' },
+  { to: '/admin', label: 'Admin', icon: '⚙️' },
+]
 
 export default function Sidebar() {
   const { user, logout } = useAuth()
 
-  const items = user?.role === 'admin'
-    ? [...navItems, adminItem]
+  const items = (user?.role === 'admin' || user?.role === 'finance')
+    ? [...navItems, ...adminItems]
     : navItems
 
   return (
