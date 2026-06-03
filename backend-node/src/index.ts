@@ -46,6 +46,12 @@ if (fs.existsSync(DIST)) {
   console.log(`Serving frontend from ${DIST}`)
 }
 
+// Global error handler — catches any unhandled async error from route handlers
+app.use((err: any, _req: any, res: any, _next: any) => {
+  console.error('[unhandled error]', err)
+  res.status(500).json({ detail: err?.message ?? 'Internal server error' })
+})
+
 app.listen(PORT, () => {
   console.log(`✓ SIGVARIS Cost Center Manager → http://localhost:${PORT}`)
 })
