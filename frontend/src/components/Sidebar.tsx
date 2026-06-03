@@ -11,8 +11,9 @@ const navItems = [
 ]
 
 const adminItems = [
-  { to: '/vendors', label: 'Vendors', icon: '🏭' },
-  { to: '/admin', label: 'Admin', icon: '⚙️' },
+  { to: '/vendors',    label: 'Vendors',    icon: '🏭' },
+  { to: '/currencies', label: 'Currencies', icon: '💱' },
+  { to: '/admin',      label: 'Admin',      icon: '⚙️' },
 ]
 
 export default function Sidebar() {
