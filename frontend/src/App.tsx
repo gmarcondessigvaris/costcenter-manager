@@ -8,6 +8,7 @@ import InvoiceDetailPage from './pages/InvoiceDetailPage'
 import BudgetsPage from './pages/BudgetsPage'
 import CostCentersPage from './pages/CostCentersPage'
 import AdminPage from './pages/AdminPage'
+import ReportPage from './pages/ReportPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -39,6 +40,7 @@ export default function App() {
           <Route path="invoices/:id" element={<InvoiceDetailPage />} />
           <Route path="budgets" element={<BudgetsPage />} />
           <Route path="cost-centers" element={<CostCentersPage />} />
+          <Route path="reports" element={<ReportPage />} />
           <Route path="admin" element={<AdminPage />} />
         </Route>
       </Routes>
