@@ -1,7 +1,7 @@
-import type { Request } from 'express'
+﻿import type { Request } from 'express'
 
-export type UserRole = 'admin' | 'finance' | 'user'
-export type MemberRole = 'owner' | 'viewer'
+export type UserRole = 'super_admin' | 'admin' | 'user'
+export type MemberRole = 'owner' | 'cc_owner'
 export type InvoiceStatus = 'pending_assignment' | 'pending_approval' | 'approved' | 'rejected'
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 
