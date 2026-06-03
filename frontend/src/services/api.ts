@@ -136,6 +136,11 @@ export const getInvoiceAuditLog = (id: string) =>
 
 export const getInvoicePdfUrl = (id: string) => `/api/invoices/${id}/pdf`
 
+export const getInvoicePdfBlob = async (id: string): Promise<string> => {
+  const res = await api.get(`/invoices/${id}/pdf`, { responseType: 'blob' })
+  return URL.createObjectURL(res.data)
+}
+
 // ── Accounts & ITR codes ──────────────────────────────────────────────────────
 export const listAccounts = () => api.get<Account[]>('/accounts').then(r => r.data)
 export const listItrCodes = () => api.get<ItrCode[]>('/itr-codes').then(r => r.data)
