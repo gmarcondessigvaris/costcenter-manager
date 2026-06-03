@@ -6,6 +6,7 @@ const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: '⊞' },
   { to: '/invoices', label: 'Invoices', icon: '📄' },
   { to: '/budgets', label: 'Budgets', icon: '💰' },
+  { to: '/reports', label: 'Reports', icon: '📊' },
   { to: '/cost-centers', label: 'Cost Centers', icon: '🏢' },
 ]
 
