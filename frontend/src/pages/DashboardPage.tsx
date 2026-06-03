@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+﻿import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { listInvoices, listCostCenters } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
@@ -18,7 +18,7 @@ function StatusBadge({ status }: { status: Invoice['status'] }) {
 export default function DashboardPage() {
   const { user } = useAuth()
   const isOwner   = user?.role === 'user'
-  const isFinance = user?.role === 'finance' || user?.role === 'admin'
+  const isFinance = user?.role === 'admin' || user?.role === 'super_admin'
 
   const { data: allInvoices = [] } = useQuery({
     queryKey: ['invoices'],
@@ -60,11 +60,11 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* NEW invoices — requires action from cost center owner */}
+      {/* NEW invoices â€” requires action from cost center owner */}
       {newInvoices.length > 0 && (
         <div className="card mb-6 border-l-4 border-blue-400">
           <h2 className="font-semibold text-gray-900 mb-1">
-            📥 New invoices — action required
+            ðŸ“¥ New invoices â€” action required
           </h2>
           <p className="text-xs text-gray-400 mb-3">
             {isFinance
@@ -90,7 +90,7 @@ export default function DashboardPage() {
                     </p>
                   </div>
                 </div>
-                <span className="text-blue-600 text-xs font-medium">Process →</span>
+                <span className="text-blue-600 text-xs font-medium">Process â†’</span>
               </Link>
             ))}
           </div>
@@ -100,7 +100,7 @@ export default function DashboardPage() {
       {/* Approvals waiting for me */}
       {myApprovals.length > 0 && (
         <div className="card mb-6 border-l-4 border-yellow-400">
-          <h2 className="font-semibold text-gray-900 mb-1">⚡ Your approval required</h2>
+          <h2 className="font-semibold text-gray-900 mb-1">âš¡ Your approval required</h2>
           <p className="text-xs text-gray-400 mb-3">It is your turn to review and approve these invoices.</p>
           <div className="space-y-2">
             {myApprovals.map(inv => (
@@ -121,11 +121,11 @@ export default function DashboardPage() {
                   <p className="text-xs text-gray-400">
                     {inv.amount
                       ? Number(inv.amount).toLocaleString('de-CH', { style: 'currency', currency: 'CHF' })
-                      : '—'}
-                    {inv.due_date && <span className="ml-2">· due {format(new Date(inv.due_date), 'dd MMM yyyy')}</span>}
+                      : 'â€”'}
+                    {inv.due_date && <span className="ml-2">Â· due {format(new Date(inv.due_date), 'dd MMM yyyy')}</span>}
                   </p>
                 </div>
-                <span className="text-yellow-700 text-xs font-medium">Review →</span>
+                <span className="text-yellow-700 text-xs font-medium">Review â†’</span>
               </Link>
             ))}
           </div>
@@ -136,7 +136,7 @@ export default function DashboardPage() {
       <div className="card">
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-semibold text-gray-900">Recent Invoices</h2>
-          <Link to="/invoices" className="text-sigvaris-blue text-sm font-medium hover:underline">View all →</Link>
+          <Link to="/invoices" className="text-sigvaris-blue text-sm font-medium hover:underline">View all â†’</Link>
         </div>
         {allInvoices.length === 0 ? (
           <p className="text-gray-400 text-sm py-4 text-center">No invoices yet</p>
