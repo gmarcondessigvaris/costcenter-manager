@@ -10,6 +10,7 @@ import CostCentersPage from './pages/CostCentersPage'
 import AdminPage from './pages/AdminPage'
 import ReportPage from './pages/ReportPage'
 import VendorsPage from './pages/VendorsPage'
+import CurrenciesPage from './pages/CurrenciesPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -43,6 +44,7 @@ export default function App() {
           <Route path="cost-centers" element={<CostCentersPage />} />
           <Route path="reports" element={<ReportPage />} />
           <Route path="vendors" element={<VendorsPage />} />
+          <Route path="currencies" element={<CurrenciesPage />} />
           <Route path="admin" element={<AdminPage />} />
         </Route>
       </Routes>
