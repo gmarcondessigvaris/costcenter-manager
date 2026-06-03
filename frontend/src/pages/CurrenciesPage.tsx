@@ -6,7 +6,7 @@ import { Navigate } from 'react-router-dom'
 import { format } from 'date-fns'
 
 export default function CurrenciesPage() {
-  const { user } = useAuth()
+  const { user, loading } = useAuth()
   const qc = useQueryClient()
 
   const [showAdd, setShowAdd]   = useState(false)
@@ -40,6 +40,7 @@ export default function CurrenciesPage() {
     onSuccess:  () => qc.invalidateQueries({ queryKey: ['currencies'] }),
   })
 
+  if (loading) return <div className="p-8 text-gray-400">Loading…</div>
   if (user?.role !== 'admin') return <Navigate to="/dashboard" replace />
 
   const active   = currencies.filter((c: any) => c.is_active)
