@@ -12,22 +12,18 @@ const navItems = [
 
 // Visible to admin + super_admin
 const adminItems = [
-  { to: '/vendors', label: 'Vendors', icon: '🏭' },
-]
-
-// Visible to super_admin only
-const superAdminItems = [
+  { to: '/vendors',    label: 'Vendors',    icon: '🏭' },
   { to: '/currencies', label: 'Currencies', icon: '💱' },
-  { to: '/admin',      label: 'Admin',      icon: '⚙️' },
+  { to: '/admin',      label: 'Users',      icon: '👥' },
 ]
 
 export default function Sidebar() {
   const { user, logout } = useAuth()
 
   const items =
-    user?.role === 'super_admin' ? [...navItems, ...adminItems, ...superAdminItems] :
-    user?.role === 'admin'       ? [...navItems, ...adminItems] :
-    navItems
+    (user?.role === 'super_admin' || user?.role === 'admin')
+      ? [...navItems, ...adminItems]
+      : navItems
 
   return (
     <aside className="w-64 bg-sigvaris-blue flex flex-col shrink-0">
