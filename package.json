@@ -1,0 +1,7 @@
+{
+  "name": "costcenter-manager",
+  "private": true,
+  "scripts": {
+    "dev": "node scripts/dev.mjs"
+  }
+}
