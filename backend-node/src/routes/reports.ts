@@ -1,6 +1,7 @@
 ﻿import { Router } from 'express'
 import { authMiddleware } from '../middleware/auth.ts'
 import { query, queryOne } from '../db.ts'
+import { getExchangeRateMode, fetchLiveRates } from './settings.ts'
 import type { AuthRequest } from '../types.ts'
 
 const router = Router()
@@ -24,6 +25,15 @@ router.get('/reports/cost-centers/:id', authMiddleware, async (req, res) => {
     [ccId]
   )
   if (!cc) { res.status(404).json({ detail: 'Cost center not found' }); return }
+
+  // Determine which exchange rates to use
+  const rateMode  = await getExchangeRateMode()
+  const liveRates = rateMode === 'auto' ? await fetchLiveRates() : {}
+
+  const getRate = (currency: string, storedRate: number): number => {
+    if (rateMode === 'auto' && liveRates[currency] !== undefined) return liveRates[currency]
+    return storedRate || 1
+  }
 
   // Budget lines with account + ITR info
   const budgetLines = await query(
@@ -84,7 +94,10 @@ router.get('/reports/cost-centers/:id', authMiddleware, async (req, res) => {
 
   const lines = budgetLines.map(bl => {
     const lineAllocs = byLine.get(bl.id as string) ?? []
-    const spent = lineAllocs.reduce((s, a) => s + Number(a.amount_chf), 0)
+    const spent = lineAllocs.reduce((s, a) => {
+      const rate = getRate(a.currency as string || 'CHF', Number(a.exchange_rate))
+      return s + Number(a.amount) * rate
+    }, 0)
     totalBudget += Number(bl.budget_value)
     totalSpent  += spent
 
@@ -133,7 +146,10 @@ router.get('/reports/cost-centers/:id', authMiddleware, async (req, res) => {
     project_name: a.project_name,
   }))
 
-  totalSpent += projectAllocations.reduce((s, a) => s + Number(a.amount_chf), 0)
+  totalSpent += projectAllocations.reduce((s, a) => {
+    const rate = getRate(a.currency as string || 'CHF', Number(a.exchange_rate))
+    return s + Number(a.amount) * rate
+  }, 0)
 
   res.json({
     cost_center: cc,
