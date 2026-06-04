@@ -152,6 +152,13 @@ export const createCurrency = (data: { code: string; name: string; rate_to_chf: 
   api.post('/currencies', data).then(r => r.data)
 export const updateCurrency = (id: string, data: { name?: string; rate_to_chf?: number; is_active?: boolean }) =>
   api.put(`/currencies/${id}`, data).then(r => r.data)
+export const getOnlineRates = () =>
+  api.get<Record<string, number>>('/currencies/online-rates').then(r => r.data)
+
+// ── Settings ──────────────────────────────────────────────────────────────────
+export const getSettings = () => api.get<Record<string, string>>('/settings').then(r => r.data)
+export const updateSetting = (key: string, value: string) =>
+  api.put(`/settings/${key}`, { value }).then(r => r.data)
 
 // ── Reports ───────────────────────────────────────────────────────────────────
 export const getCostCenterReport = (ccId: string, fiscalYear: string) =>
