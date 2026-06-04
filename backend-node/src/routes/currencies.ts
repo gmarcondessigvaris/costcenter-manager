@@ -1,6 +1,7 @@
 ﻿import { Router } from 'express'
 import { authMiddleware, requireRole } from '../middleware/auth.ts'
 import { query, queryOne } from '../db.ts'
+import { fetchLiveRates } from './settings.ts'
 import type { AuthRequest } from '../types.ts'
 
 const router = Router()
@@ -47,6 +48,16 @@ router.put('/currencies/:id', authMiddleware, requireRole('super_admin', 'admin'
   )
   if (!rows.length) { res.status(404).json({ detail: 'Currency not found' }); return }
   res.json(rows[0])
+})
+
+// Fetch live rates from Frankfurter ECB API
+router.get('/currencies/online-rates', authMiddleware, requireRole('super_admin', 'admin'), async (_req, res) => {
+  const rates = await fetchLiveRates()
+  if (!Object.keys(rates).length) {
+    res.status(503).json({ detail: 'Could not fetch rates from Frankfurter API. Check your internet connection.' })
+    return
+  }
+  res.json(rates)
 })
 
 export default router
