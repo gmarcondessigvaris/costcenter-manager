@@ -23,8 +23,9 @@ export default function LoginPage() {
     setBusy(true)
     try {
       await login({ email, displayName: name })
-    } catch {
-      setError('Login failed — check that the backend is running.')
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail || err?.message || String(err)
+      setError(`Login failed: ${detail}`)
     } finally {
       setBusy(false)
     }
