@@ -1,4 +1,4 @@
-﻿import { Router } from 'express'
+import { Router } from 'express'
 import { authMiddleware, requireRole } from '../middleware/auth.ts'
 import { query, queryOne } from '../db.ts'
 import { logAction } from '../services/audit.ts'
@@ -79,7 +79,7 @@ router.put('/cost-centers/:id', authMiddleware, requireRole('super_admin'), asyn
   res.json(cc)
 })
 
-router.post('/cost-centers/:id/members', authMiddleware, requireRole('super_admin'), async (req, res) => {
+router.post('/cost-centers/:id/members', authMiddleware, requireRole('super_admin', 'admin'), async (req, res) => {
   const { user_id, role = 'owner' } = req.body as { user_id: string; role?: string }
   const ccId = req.params.id
   const actor = (req as AuthRequest).user
@@ -99,7 +99,7 @@ router.post('/cost-centers/:id/members', authMiddleware, requireRole('super_admi
   res.status(201).json(await getCostCenter(ccId))
 })
 
-router.delete('/cost-centers/:id/members/:userId', authMiddleware, requireRole('super_admin'), async (req, res) => {
+router.delete('/cost-centers/:id/members/:userId', authMiddleware, requireRole('super_admin', 'admin'), async (req, res) => {
   const { id: ccId, userId } = req.params
   const actor = (req as AuthRequest).user
   const result = await query(
