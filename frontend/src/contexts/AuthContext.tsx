@@ -76,16 +76,19 @@ function DevAuthProvider({ children }: { children: React.ReactNode }) {
 
 // ── Azure AD provider (MSAL) ──────────────────────────────────────────────────
 
-const msalConfig: Configuration = {
+// Only initialise MSAL when Azure AD credentials are actually configured.
+// In DEV_AUTH mode the MSAL instance is never used, so skip instantiation
+// (PublicClientApplication throws when clientId is empty in recent versions).
+const msalConfig: Configuration | null = !DEV_AUTH && CLIENT_ID ? {
   auth: {
-    clientId: CLIENT_ID ?? '',
+    clientId: CLIENT_ID,
     authority: `https://login.microsoftonline.com/${TENANT_ID ?? ''}`,
     redirectUri: window.location.origin,
   },
   cache: { cacheLocation: 'sessionStorage' },
-}
+} : null
 
-export const msalInstance = new PublicClientApplication(msalConfig)
+export const msalInstance = msalConfig ? new PublicClientApplication(msalConfig) : null
 const SCOPES = [`api://${CLIENT_ID}/user_impersonation`]
 
 function AzureAuthInner({ children }: { children: React.ReactNode }) {
@@ -137,7 +140,7 @@ function AzureAuthInner({ children }: { children: React.ReactNode }) {
 // ── Root provider ─────────────────────────────────────────────────────────────
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  if (DEV_AUTH) return <DevAuthProvider>{children}</DevAuthProvider>
+  if (DEV_AUTH || !msalInstance) return <DevAuthProvider>{children}</DevAuthProvider>
   return (
     <MsalProvider instance={msalInstance}>
       <AzureAuthInner>{children}</AzureAuthInner>
