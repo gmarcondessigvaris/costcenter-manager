@@ -103,7 +103,7 @@ function AddMemberForm({ ccId }: { ccId: string }) {
 
 function CostCenterCard({ cc }: { cc: CostCenter }) {
   const { user } = useAuth()
-  const isAdmin = user?.role === 'super_admin'
+  const isAdmin = user?.role === 'super_admin' || user?.role === 'admin'
   const [expanded, setExpanded] = useState(false)
 
   return (
@@ -147,7 +147,7 @@ function CostCenterCard({ cc }: { cc: CostCenter }) {
 export default function CostCentersPage() {
   const { user } = useAuth()
   const qc = useQueryClient()
-  const isAdmin = user?.role === 'super_admin'
+  const isAdmin = user?.role === 'super_admin' || user?.role === 'admin'
   const [showCreate, setShowCreate] = useState(false)
   const [newCode, setNewCode] = useState('')
   const [newName, setNewName] = useState('')
