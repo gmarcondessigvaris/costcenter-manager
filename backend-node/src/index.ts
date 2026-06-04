@@ -14,6 +14,7 @@ import accountsRouter from './routes/accounts.ts'
 import itrCodesRouter from './routes/itrCodes.ts'
 import reportsRouter from './routes/reports.ts'
 import currenciesRouter from './routes/currencies.ts'
+import settingsRouter from './routes/settings.ts'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -37,6 +38,7 @@ app.use('/api', accountsRouter)
 app.use('/api', itrCodesRouter)
 app.use('/api', reportsRouter)
 app.use('/api', currenciesRouter)
+app.use('/api', settingsRouter)
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }))
 
 // Serve built frontend if dist exists
